@@ -7,11 +7,15 @@ Stack: Rust + Bevy 0.19 · granularity: coarse · mode: mvp
 **Goal:** Recorrer `~/Data` y producir `Vec<FolderNode>` correcto, con symlinks resueltos sin loops.
 **Mode:** mvp
 **Requirements:** SCAN-01, SCAN-02
+**Plans:** 1 plan
 **Success Criteria**:
 1. `cargo test` valida que escanea ~/Data y excluye node_modules/.git/Steam/cache
 2. Imprime ~604 nodos con su root_group y depth correctos
 3. `01_Now` (symlink a 20_Knowledge) aparece una vez, marcado is_symlink, sin colgarse
 4. Cada nodo tiene parent_id, child_count y root_group bien asignados
+
+Plans:
+- [ ] 01-01-PLAN.md — Cargo scaffold + FolderNode struct + scan_folder con exclusiones, symlinks y test suite
 
 ### Phase 2: Render estático + cámara
 **Goal:** App Bevy que dibuja los nodos como esferas y los edges, navegable con cámara orbital.
