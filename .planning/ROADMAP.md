@@ -71,3 +71,9 @@ Plans:
 2. Tamaño de nodo escala con child_count
 3. Symlinks con marca visual diferenciada
 4. Se puede cambiar la raíz escaneada desde la app y el grafo se reconstruye (default ~/Data)
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — VIS-02 tamaño por child_count (node_scale) + symlinks material distinto + revisión paleta VIS-01 (render.rs)
+- [ ] 05-02-PLAN.md — ROOT-01 raíz configurable: input + botón Reescanear (egui) + reconstrucción async (despawn viejos → re-scan → re-layout) + ruta inválida sin panic (main.rs, ui.rs)
