@@ -32,7 +32,7 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 ## v2 — Desktop mode (planificando)
 | # | Phase | Status |
 |---|-------|--------|
-| 6 | Ventana Desktop X11 | pending |
+| 6 | Ventana Desktop → overlay on-demand | 🔨 06-01 spike ✅ + 06-02 overlay ✅; falta 06-03 (atajo KDE) |
 | 7 | Archivos on-demand | pending |
 | 8 | Pins + persistencia | pending |
 | 9 | Autostart + integración | pending |
