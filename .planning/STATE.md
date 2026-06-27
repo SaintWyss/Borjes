@@ -1,7 +1,7 @@
 # State — datatree-rs
 
-**Status:** Initialized · ready to plan Phase 1
-**Current phase:** 1 (Scanner)
+**Status:** Phase 1 EJECUTADA y verificada · ready to plan Phase 2
+**Current phase:** 2 (Render + cámara)
 **Stack:** Rust + Bevy 0.19, bevy_panorbit_camera 0.35, bevy_egui 0.40.1, ignore, open 5.3.5
 
 ## Progress
@@ -15,7 +15,7 @@
 ## Phases
 | # | Phase | Status |
 |---|-------|--------|
-| 1 | Scanner | pending |
+| 1 | Scanner | ✅ done (4607 nodos reales, 7 tests verde, b9619f9) |
 | 2 | Render + cámara | pending |
 | 3 | Layout galaxia | pending |
 | 4 | Interacción + búsqueda | pending |

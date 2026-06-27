@@ -10,7 +10,7 @@ Stack: Rust + Bevy 0.19 · granularity: coarse · mode: mvp
 **Plans:** 1 plan
 **Success Criteria**:
 1. `cargo test` valida que escanea ~/Data y excluye node_modules/.git/Steam/cache
-2. Imprime ~604 nodos con su root_group y depth correctos
+2. Imprime ~4600 nodos con su root_group y depth correctos (el ~604 inicial era un preview capeado a depth 5; el árbol real a profundidad completa ronda 4607)
 3. `01_Now` (symlink a 20_Knowledge) aparece una vez, marcado is_symlink, sin colgarse
 4. Cada nodo tiene parent_id, child_count y root_group bien asignados
 
@@ -22,7 +22,7 @@ Plans:
 **Mode:** mvp
 **Requirements:** GRAPH-01, CAM-01
 **Success Criteria**:
-1. La ventana abre y muestra 604 esferas (posiciones random por ahora) + edges padre→hijo
+1. La ventana abre y muestra ~4600 esferas (posiciones random por ahora) + edges padre→hijo
 2. Cámara orbital funciona: rotar, zoom, pan con mouse
 3. Corre fluido (≥60 fps) con MeshPickingPlugin ya cargado
 4. Un solo mesh handle compartido + material por cluster (≤10 draw calls de nodos)
@@ -35,7 +35,7 @@ Plans:
 1. Fruchterman-Reingold + cluster-pull corre en AsyncComputeTaskPool al startup (no congela la ventana)
 2. Se ve "Computing layout…" mientras calcula y luego se acomoda
 3. Los cúmulos por carpeta-raíz quedan claramente separados en el espacio (efecto galaxia)
-4. Layout estable < 300ms para 604 nodos
+4. Layout estable para ~4600 nodos (OJO PERF: a 4607 nodos, Fruchterman-Reingold O(N²) = ~21M pares/iter × 300 ≈ 6.3B ops/pasada, ya NO "trivial" como asumió el research para 604 → evaluar Barnes-Hut o reducir iteraciones; sigue siendo cálculo único en AsyncComputeTaskPool)
 
 ### Phase 4: Interacción + búsqueda
 **Goal:** Llegar a una carpeta: buscarla, centrarla y abrirla en Dolphin.
