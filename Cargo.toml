@@ -8,4 +8,7 @@ name = "datatree-rs"
 path = "src/main.rs"
 
 [dependencies]
+bevy = "0.19"
+bevy_panorbit_camera = "0.35"
 ignore = "0.4"
+rand = "0.8"
