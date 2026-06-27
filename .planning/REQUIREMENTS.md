@@ -3,9 +3,10 @@
 ## v2 "Desktop mode" Requirements (milestone activo)
 
 ### Desktop (integración X11/KDE)
-- [ ] **DESK-01**: La app corre como ventana tipo Desktop X11 (`_NET_WM_WINDOW_TYPE_DESKTOP` vía winit), sin decoración, fullscreen, debajo de todas las ventanas
-- [ ] **DESK-02**: El grafo se revela con Mostrar escritorio (Meta+D) / al minimizar ventanas, conviviendo con el wallpaper de Plasma (fondo Plasma plano/transparente)
-- [ ] **DESK-03**: La app se lanza automáticamente al login (autostart KDE, per-máquina)
+> **Decisión 2026-06-27 (dobla D1):** el spike 06-01 probó que la ventana tipo Desktop X11 puro NO sirve en este KDE — plasmashell la tapa, Meta+D no la revela, y el render continuo necesario trababa la sesión. Reinterpretado a **overlay on-demand**: oculto por default (~0% CPU), se invoca con un atajo. Ver `.planning/phases/06-ventana-desktop-x11/06-01-SUMMARY.md`.
+- [ ] **DESK-01**: La app corre como **overlay on-demand**: ventana borderless fullscreen, `WindowLevel::AlwaysOnTop`, arranca oculta (`visible:false`), render Reactive; se muestra/oculta con SIGUSR1 (Esc oculta). (Antes: ventana tipo Desktop X11 — inviable, ver decisión arriba.)
+- [ ] **DESK-02**: El grafo se revela con un atajo global de KDE (`pkill -SIGUSR1`), conviviendo con el desktop existente sin pelear con el wallpaper (al mostrarse va arriba; oculto no dibuja nada). AnyDesk sigue funcionando.
+- [ ] **DESK-03**: La app se lanza automáticamente al login, oculta (autostart KDE, per-máquina) — Fase 9
 
 ### Files (archivos on-demand)
 - [ ] **FILE-01**: Click en una carpeta expande/colapsa sus archivos como nodos hoja (scan lazy de ese dir, un nivel)
