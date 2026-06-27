@@ -2410,7 +2410,9 @@ dependencies = [
  "ignore",
  "open",
  "rand 0.8.6",
+ "raw-window-handle",
  "unicode-normalization",
+ "x11rb",
 ]
 
 [[package]]

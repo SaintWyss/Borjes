@@ -1,6 +1,7 @@
 // Lints idiomáticos en Bevy (Query tuples + system-params). Allow a nivel crate.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+mod desktop;
 mod interaction;
 mod layout;
 mod render;
@@ -11,10 +12,13 @@ mod ui;
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, poll_once, AsyncComputeTaskPool, Task};
+use bevy::window::{MonitorSelection, Window, WindowPlugin};
+use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use std::path::PathBuf;
 
+use crate::desktop::{apply_desktop_window_type, DesktopModeApplied};
 use crate::root::{expand_tilde, PendingRescan, RootConfig};
 use crate::scan::FolderNode;
 
@@ -30,11 +34,24 @@ struct LayoutText;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    decorations: false,
+                    mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+                    focused: false,
+                    ..default()
+                }),
+                ..default()
+            }),
             MeshPickingPlugin,
             EguiPlugin::default(),
             PanOrbitCameraPlugin,
         ))
+        .insert_resource(WinitSettings {
+            focused_mode: UpdateMode::Continuous,
+            unfocused_mode: UpdateMode::Continuous,
+        })
+        .insert_resource(DesktopModeApplied::default())
         .insert_resource(render::GraphData(Vec::new()))
         .insert_resource(RootConfig::default())
         .insert_resource(PendingRescan::default())
@@ -46,6 +63,7 @@ fn main() {
         .add_systems(
             Update,
             (
+                apply_desktop_window_type,
                 handle_rescan,
                 apply_layout,
                 render::draw_edges,
