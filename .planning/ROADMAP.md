@@ -77,3 +77,46 @@ Plans:
 Plans:
 - [ ] 05-01-PLAN.md — VIS-02 tamaño por child_count (node_scale) + symlinks material distinto + revisión paleta VIS-01 (render.rs)
 - [ ] 05-02-PLAN.md — ROOT-01 raíz configurable: input + botón Reescanear (egui) + reconstrucción async (despawn viejos → re-scan → re-layout) + ruta inválida sin panic (main.rs, ui.rs)
+
+---
+
+# v2 "Desktop mode" — 4 fases · 11 requirements · cobertura 100% ✓
+
+### Phase 6: Ventana Desktop X11
+**Goal:** La app corre como capa de escritorio (ventana tipo Desktop X11) revelada con Meta+D, conviviendo con Plasma.
+**Mode:** mvp
+**Requirements:** DESK-01, DESK-02
+**Success Criteria**:
+1. La ventana se setea `_NET_WM_WINDOW_TYPE_DESKTOP` (winit X11), sin decoración, fullscreen, debajo de todas las ventanas
+2. Meta+D (Mostrar escritorio) revela el grafo; abrir una ventana lo tapa de nuevo
+3. No tapa ni es tapado por el wallpaper de Plasma (fondo Plasma plano/transparente documentado)
+4. AnyDesk/X11 siguen funcionando (no se rompe el flujo)
+
+### Phase 7: Archivos on-demand
+**Goal:** Click en carpeta expande sus archivos como nodos hoja en burst local, doble-click abre.
+**Mode:** mvp
+**Requirements:** FILE-01, FILE-02, FILE-03, FILE-04, INT-01
+**Success Criteria**:
+1. Click en una carpeta scanea y muestra SUS archivos (un nivel) como nodos hoja; segundo click los colapsa
+2. Los archivos aparecen en burst local radial alrededor de su carpeta sin re-acomodar la galaxia
+3. Nodos-archivo visualmente distintos de carpetas
+4. Doble-click: carpeta→Dolphin, archivo→xdg-open (app default)
+
+### Phase 8: Pins + persistencia
+**Goal:** Pinear nodos por click-derecho, persistidos y siempre visibles.
+**Mode:** mvp
+**Requirements:** PIN-01, PIN-02, PIN-03
+**Success Criteria**:
+1. Click-derecho en un nodo abre menú egui con "Pin"/"Unpin"
+2. Los pins se guardan en ~/.config/datatree-rs/pins.json y se cargan al arrancar
+3. Los pins sobreviven colapso/reescaneo (siempre visibles)
+4. Nodos pinneados con marca visual propia (borde/color dorado)
+
+### Phase 9: Autostart + integración escritorio
+**Goal:** La app arranca sola al login y queda como escritorio del usuario.
+**Mode:** mvp
+**Requirements:** DESK-03
+**Success Criteria**:
+1. Entry de autostart KDE creado (per-máquina) que lanza la app en modo desktop al login
+2. Registrado en sync-control (ops de sistema) con OK del usuario
+3. Tras reboot/login la app aparece como escritorio sin intervención

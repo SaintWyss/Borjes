@@ -1,6 +1,37 @@
-# Requirements — datatree-rs (v1)
+# Requirements — datatree-rs
 
-## v1 Requirements
+## v2 "Desktop mode" Requirements (milestone activo)
+
+### Desktop (integración X11/KDE)
+- [ ] **DESK-01**: La app corre como ventana tipo Desktop X11 (`_NET_WM_WINDOW_TYPE_DESKTOP` vía winit), sin decoración, fullscreen, debajo de todas las ventanas
+- [ ] **DESK-02**: El grafo se revela con Mostrar escritorio (Meta+D) / al minimizar ventanas, conviviendo con el wallpaper de Plasma (fondo Plasma plano/transparente)
+- [ ] **DESK-03**: La app se lanza automáticamente al login (autostart KDE, per-máquina)
+
+### Files (archivos on-demand)
+- [ ] **FILE-01**: Click en una carpeta expande/colapsa sus archivos como nodos hoja (scan lazy de ese dir, un nivel)
+- [ ] **FILE-02**: Los nodos-archivo se ven distintos de las carpetas (tamaño/forma/color)
+- [ ] **FILE-03**: Doble-click en un archivo lo abre con su app default (`xdg-open`)
+- [ ] **FILE-04**: Al expandir, los archivos aparecen en burst local alrededor de su carpeta SIN re-acomodar toda la galaxia
+
+### Interaction
+- [ ] **INT-01**: Click = expandir (toggle archivos); doble-click = abrir (carpeta→Dolphin, archivo→app default)
+
+### Pins
+- [ ] **PIN-01**: Click-derecho en un nodo → "Pin" (menú egui)
+- [ ] **PIN-02**: Los pins persisten en `~/.config/datatree-rs/pins.json` y sobreviven colapso/reescaneo
+- [ ] **PIN-03**: Los nodos pinneados tienen marca visual propia (ej borde dorado) y quedan siempre visibles
+
+## v2 Traceability
+| REQ | Fase |
+|-----|------|
+| DESK-01, DESK-02 | 6 |
+| FILE-01..04, INT-01 | 7 |
+| PIN-01..03 | 8 |
+| DESK-03 | 9 |
+
+---
+
+## v1 Requirements — VALIDADOS ✅ (milestone v1 completo)
 
 ### Scan (FS)
 - [ ] **SCAN-01**: La app escanea `~/Data` y construye el árbol de carpetas excluyendo node_modules/.git/.cache/Steam/target/__pycache__/.Trash

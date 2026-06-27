@@ -10,6 +10,19 @@ Cada carpeta-raíz de `~/Data` (00_Inbox, 10_Workspace, 20_Knowledge, 30_Cyberse
 
 **Encontrar y abrir una carpeta profunda en segundos, visualmente.** Si el grafo no deja llegar a `AdSI` (enterrada en `20_Knowledge/UTN_FRRe/Ingeniería_en_Sistemas/4_cuarto_año/`) más rápido que el explorador, falló.
 
+## Current Milestone: v2 "Desktop mode"
+
+**Goal:** El grafo 3D deja de ser solo un explorador y se vuelve la **capa de escritorio** del usuario, revelada con Mostrar escritorio (Meta+D).
+
+**Target features:**
+- Ventana tipo Desktop X11 (`_NET_WM_WINDOW_TYPE_DESKTOP` vía winit), bajo todo, revelada con Meta+D
+- Archivos on-demand: click en carpeta expande/colapsa sus archivos como nodos hoja (burst local, sin re-layout global)
+- Click = expandir, doble-click = abrir (carpeta→Dolphin, archivo→xdg-open)
+- Pins por click-derecho, persistidos en `~/.config/datatree-rs/pins.json`, sobreviven reescaneo
+- Autostart KDE (per-máquina, registrado en sync-control)
+
+Spec: `docs/superpowers/specs/2026-06-27-desktop-mode-design.md`. v1 (5 fases) completa y validada.
+
 ## Context
 
 - Surgió de querer un mapa visual del FS; se descartó un preview web (React) porque el usuario quiere un **programa nativo de la PC**, no un sitio.
