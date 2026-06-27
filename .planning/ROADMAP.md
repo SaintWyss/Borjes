@@ -41,6 +41,11 @@ Plans:
 3. Los cúmulos por carpeta-raíz quedan claramente separados en el espacio (efecto galaxia)
 4. Layout estable para ~4600 nodos (OJO PERF: a 4607 nodos, Fruchterman-Reingold O(N²) = ~21M pares/iter × 300 ≈ 6.3B ops/pasada, ya NO "trivial" como asumió el research para 604 → evaluar Barnes-Hut o reducir iteraciones; sigue siendo cálculo único en AsyncComputeTaskPool)
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 03-01-PLAN.md — layout.rs run_layout (FR O(N²) + cluster-pull + seed de centroides) + test de clustering; integración AsyncComputeTaskPool one-shot + indicador "Computing layout…" + aplicar posiciones por NodeRef
+
 ### Phase 4: Interacción + búsqueda
 **Goal:** Llegar a una carpeta: buscarla, centrarla y abrirla en Dolphin.
 **Mode:** mvp
