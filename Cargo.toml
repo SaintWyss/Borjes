@@ -1,0 +1,11 @@
+[package]
+name = "datatree-rs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "datatree-rs"
+path = "src/main.rs"
+
+[dependencies]
+ignore = "0.4"
