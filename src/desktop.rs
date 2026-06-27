@@ -1,83 +1,39 @@
 use bevy::prelude::*;
-use bevy::window::{PrimaryWindow, RawHandleWrapper};
-use raw_window_handle::RawWindowHandle;
-use x11rb::connection::Connection;
-use x11rb::protocol::xproto::{Atom, AtomEnum, ConnectionExt as XProtoConnectionExt, PropMode};
-use x11rb::wrapper::ConnectionExt as X11WrapperConnectionExt;
+use bevy::window::PrimaryWindow;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-#[derive(Resource, Default)]
-pub struct DesktopModeApplied(pub bool);
+static TOGGLE_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-pub fn apply_desktop_window_type(
-    mut applied: ResMut<DesktopModeApplied>,
-    q: Query<&RawHandleWrapper, With<PrimaryWindow>>,
+extern "C" fn handle_sigusr1(_sig: i32) {
+    TOGGLE_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+pub fn install_signal_handler() {
+    // SAFETY: handler only does an atomic store, async-signal-safe.
+    unsafe {
+        libc::signal(
+            libc::SIGUSR1,
+            handle_sigusr1 as *const () as libc::sighandler_t,
+        );
+    }
+}
+
+pub fn toggle_overlay_visibility(
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    keys: Res<ButtonInput<KeyCode>>,
 ) {
-    if applied.0 {
-        return;
-    }
-
-    let Ok(wrapper) = q.single() else {
+    let Ok(mut window) = windows.single_mut() else {
         return;
     };
 
-    let xid = match wrapper.get_window_handle() {
-        RawWindowHandle::Xlib(handle) => handle.window as u32,
-        RawWindowHandle::Xcb(handle) => handle.window.get(),
-        other => {
-            warn!("not an X11 window handle ({other:?}); desktop mode is X11-only");
-            applied.0 = true;
-            return;
-        }
-    };
-
-    match set_desktop_window_type(xid) {
-        Ok(()) => {
-            info!("set _NET_WM_WINDOW_TYPE_DESKTOP on XID {xid:#x}");
-            applied.0 = true;
-        }
-        Err(err) => {
-            warn!("failed to set desktop window type on XID {xid:#x}: {err}");
-            applied.0 = true;
+    if TOGGLE_REQUESTED.swap(false, Ordering::SeqCst) {
+        window.visible = !window.visible;
+        if window.visible {
+            window.focused = true;
         }
     }
-}
 
-fn set_desktop_window_type(xid: u32) -> Result<(), Box<dyn std::error::Error>> {
-    let (conn, _screen) = x11rb::connect(None)?;
-
-    let wm_type_atom = intern_atom(&conn, b"_NET_WM_WINDOW_TYPE")?;
-    let desktop_atom = intern_atom(&conn, b"_NET_WM_WINDOW_TYPE_DESKTOP")?;
-    let wm_state_atom = intern_atom(&conn, b"_NET_WM_STATE")?;
-    let below_atom = intern_atom(&conn, b"_NET_WM_STATE_BELOW")?;
-    let skip_taskbar_atom = intern_atom(&conn, b"_NET_WM_STATE_SKIP_TASKBAR")?;
-    let skip_pager_atom = intern_atom(&conn, b"_NET_WM_STATE_SKIP_PAGER")?;
-
-    conn.change_property32(
-        PropMode::REPLACE,
-        xid,
-        wm_type_atom,
-        AtomEnum::ATOM,
-        &[desktop_atom],
-    )?
-    .check()?;
-
-    conn.change_property32(
-        PropMode::REPLACE,
-        xid,
-        wm_state_atom,
-        AtomEnum::ATOM,
-        &[below_atom, skip_taskbar_atom, skip_pager_atom],
-    )?
-    .check()?;
-
-    conn.flush()?;
-
-    Ok(())
-}
-
-fn intern_atom<C>(conn: &C, name: &[u8]) -> Result<Atom, Box<dyn std::error::Error>>
-where
-    C: XProtoConnectionExt,
-{
-    Ok(conn.intern_atom(false, name)?.reply()?.atom)
+    if window.visible && keys.just_pressed(KeyCode::Escape) {
+        window.visible = false;
+    }
 }

@@ -2408,11 +2408,10 @@ dependencies = [
  "bevy_egui",
  "bevy_panorbit_camera",
  "ignore",
+ "libc",
  "open",
  "rand 0.8.6",
- "raw-window-handle",
  "unicode-normalization",
- "x11rb",
 ]
 
 [[package]]

@@ -12,13 +12,14 @@ mod ui;
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, poll_once, AsyncComputeTaskPool, Task};
-use bevy::window::{MonitorSelection, Window, WindowPlugin};
+use bevy::window::{MonitorSelection, Window, WindowMode, WindowPlugin};
 use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use std::path::PathBuf;
+use std::time::Duration;
 
-use crate::desktop::{apply_desktop_window_type, DesktopModeApplied};
+use crate::desktop::{install_signal_handler, toggle_overlay_visibility};
 use crate::root::{expand_tilde, PendingRescan, RootConfig};
 use crate::scan::FolderNode;
 
@@ -37,8 +38,9 @@ fn main() {
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
                     decorations: false,
-                    mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
-                    focused: false,
+                    mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+                    visible: false,
+                    window_level: bevy::window::WindowLevel::AlwaysOnTop,
                     ..default()
                 }),
                 ..default()
@@ -48,22 +50,24 @@ fn main() {
             PanOrbitCameraPlugin,
         ))
         .insert_resource(WinitSettings {
-            focused_mode: UpdateMode::Continuous,
-            unfocused_mode: UpdateMode::Continuous,
+            focused_mode: UpdateMode::reactive(Duration::from_secs(5)),
+            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_secs(60)),
         })
-        .insert_resource(DesktopModeApplied::default())
         .insert_resource(render::GraphData(Vec::new()))
         .insert_resource(RootConfig::default())
         .insert_resource(PendingRescan::default())
         .insert_resource(interaction::Selected(None))
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
-        .add_systems(Startup, (setup_camera, start_layout))
+        .add_systems(
+            Startup,
+            (install_signal_handler, setup_camera, start_layout),
+        )
         .add_systems(EguiPrimaryContextPass, ui::search_panel)
         .add_systems(
             Update,
             (
-                apply_desktop_window_type,
+                toggle_overlay_visibility,
                 handle_rescan,
                 apply_layout,
                 render::draw_edges,
