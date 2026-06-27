@@ -56,6 +56,12 @@ Plans:
 3. Buscador egui (top panel) filtra acento-insensible y la cámara se anima hacia el nodo
 4. egui no dispara picking por debajo (`is_pointer_over_area` chequeado)
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — interaction.rs: hover highlight + click selecciona/loggea ruta + doble-click abre Dolphin en thread (open 5.3.5) + guard is_pointer_over_area; deps egui/open/unicode-normalization
+- [ ] 04-02-PLAN.md — ui.rs: panel egui buscador + normalize() acento-insensible (unit test) + resaltar matches + SearchTarget + lerp de cámara al primer match
+
 ### Phase 5: Lectura visual + raíz configurable (polish)
 **Goal:** El grafo comunica de un vistazo y se puede apuntar a otra raíz.
 **Mode:** mvp
