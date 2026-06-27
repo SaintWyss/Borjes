@@ -92,6 +92,13 @@ Plans:
 3. No tapa ni es tapado por el wallpaper de Plasma (fondo Plasma plano/transparente documentado)
 4. AnyDesk/X11 siguen funcionando (no se rompe el flujo)
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Spike Wave 0: x11rb tag _NET_WM_WINDOW_TYPE_DESKTOP + window config + 8-step KDE acceptance (resolves D1 risk)
+- [ ] 06-02-PLAN.md — Finalize DESK-01 desktop window on the spike-chosen path (D1-bend checkpoint if fallback needed)
+- [ ] 06-03-PLAN.md — DESK-02 Plasma Plain Color coexistence + Meta+D/AnyDesk verify + sync-control register
+
 ### Phase 7: Archivos on-demand
 **Goal:** Click en carpeta expande sus archivos como nodos hoja en burst local, doble-click abre.
 **Mode:** mvp
