@@ -12,6 +12,7 @@ pub struct GraphData(pub Vec<FolderNode>);
 #[allow(dead_code)]
 pub struct NodeRef(pub usize);
 
+#[allow(dead_code)]
 pub fn seed_random_positions(nodes: &mut [FolderNode]) {
     let mut rng = rand::thread_rng();
 
@@ -24,11 +25,21 @@ pub fn seed_random_positions(nodes: &mut [FolderNode]) {
     }
 }
 
+#[allow(dead_code)]
 pub fn spawn_graph(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     graph: Res<GraphData>,
+) {
+    spawn_graph_nodes(&mut commands, &mut meshes, &mut materials, &graph);
+}
+
+pub fn spawn_graph_nodes(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    graph: &GraphData,
 ) {
     let sphere = meshes.add(Sphere::new(0.5));
     let mut cluster_materials: HashMap<usize, Handle<StandardMaterial>> = HashMap::new();
