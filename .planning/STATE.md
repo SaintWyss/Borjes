@@ -1,7 +1,7 @@
 # State — datatree-rs
 
-**Status:** Phase 4 EJECUTADA y verificada (auto) · pendiente smoke-test interactivo del usuario · ready to plan Phase 5
-**Current phase:** 5 (Visual + raíz config)
+**Status:** 🎉 v1 COMPLETA — las 5 fases ejecutadas y verificadas · pendiente smoke-test interactivo del usuario (búsqueda, doble-click→Dolphin, reescaneo)
+**Current phase:** — (v1 cerrada)
 **Stack:** Rust + Bevy 0.19, bevy_panorbit_camera 0.35, bevy_egui 0.40.1, ignore, open 5.3.5
 
 ## Progress
@@ -19,6 +19,7 @@
 | 2 | Render + cámara | ✅ done (Bevy 0.19, ventana abre, 8 tests, 1ec8e44) |
 | 3 | Layout galaxia | ✅ done (FR+cluster-pull, cúmulos por color, 11 tests, d5e6a2b; release p/ perf) |
 | 4 | Interacción + buscador | ✅ done (egui buscador + doble-click→Dolphin, 14 tests, f14c417; smoke-test interactivo pendiente) |
+| 5 | Visual + raíz config | ✅ done (tamaño por child_count, symlinks magenta, raíz+reescanear, 40 tests) |
 | 2 | Render + cámara | pending |
 | 3 | Layout galaxia | pending |
 | 4 | Interacción + búsqueda | pending |
