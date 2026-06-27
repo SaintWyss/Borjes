@@ -4,6 +4,7 @@
 mod interaction;
 mod layout;
 mod render;
+mod root;
 mod scan;
 mod ui;
 
@@ -14,19 +15,19 @@ use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use std::path::PathBuf;
 
+use crate::root::{expand_tilde, PendingRescan, RootConfig};
 use crate::scan::FolderNode;
 
 #[derive(Resource)]
-struct LayoutTask(Task<Vec<FolderNode>>);
+struct LayoutTask {
+    task: Task<Vec<FolderNode>>,
+    root_path: PathBuf,
+}
 
 #[derive(Component)]
 struct LayoutText;
 
 fn main() {
-    let home = std::env::var("HOME").expect("HOME not set");
-    let data_path = PathBuf::from(home).join("Data");
-    let nodes = scan::scan_folder(&data_path);
-
     App::new()
         .add_plugins((
             DefaultPlugins,
@@ -34,7 +35,9 @@ fn main() {
             EguiPlugin::default(),
             PanOrbitCameraPlugin,
         ))
-        .insert_resource(render::GraphData(nodes))
+        .insert_resource(render::GraphData(Vec::new()))
+        .insert_resource(RootConfig::default())
+        .insert_resource(PendingRescan::default())
         .insert_resource(interaction::Selected(None))
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
@@ -43,10 +46,12 @@ fn main() {
         .add_systems(
             Update,
             (
+                handle_rescan,
                 apply_layout,
                 render::draw_edges,
                 ui::animate_camera_to_target,
-            ),
+            )
+                .chain(),
         )
         .add_observer(interaction::on_node_over)
         .add_observer(interaction::on_node_out)
@@ -75,20 +80,25 @@ fn setup_camera(mut commands: Commands, mut materials: ResMut<Assets<StandardMat
     ));
 }
 
-fn start_layout(mut commands: Commands, mut graph: ResMut<render::GraphData>) {
-    let mut nodes = std::mem::take(&mut graph.0);
-    let edges: Vec<(usize, usize)> = nodes
-        .iter()
-        .filter_map(|node| node.parent_id.map(|parent_id| (node.id, parent_id)))
-        .collect();
+fn start_layout(mut commands: Commands, root: Res<RootConfig>) {
+    start_layout_task(&mut commands, expand_tilde(&root.path));
+}
 
+fn start_layout_task(commands: &mut Commands, root_path: PathBuf) {
+    let task_root_path = root_path.clone();
     let pool = AsyncComputeTaskPool::get();
     let task = pool.spawn(async move {
+        let mut nodes = scan::scan_folder(&task_root_path);
+        let edges: Vec<(usize, usize)> = nodes
+            .iter()
+            .filter_map(|node| node.parent_id.map(|parent_id| (node.id, parent_id)))
+            .collect();
+
         layout::run_layout(&mut nodes, &edges);
         nodes
     });
 
-    commands.insert_resource(LayoutTask(task));
+    commands.insert_resource(LayoutTask { task, root_path });
     commands.spawn((
         Text::new("Computing layout…"),
         TextFont::from_font_size(28.0),
@@ -103,10 +113,46 @@ fn start_layout(mut commands: Commands, mut graph: ResMut<render::GraphData>) {
     ));
 }
 
+fn handle_rescan(
+    mut commands: Commands,
+    mut pending: ResMut<PendingRescan>,
+    task: Option<Res<LayoutTask>>,
+    node_entities: Query<Entity, With<render::NodeRef>>,
+    mut selected: ResMut<interaction::Selected>,
+    mut search: ResMut<ui::SearchState>,
+    mut target: ResMut<ui::SearchTarget>,
+    mut graph: ResMut<render::GraphData>,
+    mut root: ResMut<RootConfig>,
+) {
+    let Some(root_path) = pending.0.take() else {
+        return;
+    };
+
+    if task.is_some() {
+        pending.0 = Some(root_path);
+        return;
+    }
+
+    for entity in &node_entities {
+        commands.entity(entity).despawn();
+    }
+
+    selected.0 = None;
+    *search = ui::SearchState::default();
+    target.0 = None;
+    graph.0.clear();
+    root.path = root_path.display().to_string();
+    root.error = None;
+
+    start_layout_task(&mut commands, root_path);
+}
+
 fn apply_layout(
     mut commands: Commands,
     task: Option<ResMut<LayoutTask>>,
     mut graph: ResMut<render::GraphData>,
+    mut root: ResMut<RootConfig>,
+    pending: Res<PendingRescan>,
     text_q: Query<Entity, With<LayoutText>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -115,12 +161,33 @@ fn apply_layout(
         return;
     };
 
-    let Some(nodes) = block_on(poll_once(&mut task.0)) else {
+    let scanned_path = task.root_path.clone();
+    let Some(nodes) = block_on(poll_once(&mut task.task)) else {
         return;
     };
 
+    let is_stale_for_pending_rescan =
+        pending.0.is_some() && expand_tilde(&root.path) != scanned_path;
+
     graph.0 = nodes;
-    render::spawn_graph_nodes(&mut commands, &mut meshes, &mut materials, &graph);
+    if is_stale_for_pending_rescan {
+        graph.0.clear();
+    } else {
+        if graph.0.is_empty() && expand_tilde(&root.path) == scanned_path {
+            root.error = Some(if scanned_path.is_dir() {
+                format!("No se encontraron carpetas en {}", scanned_path.display())
+            } else {
+                format!(
+                    "La ruta no existe o no es un directorio: {}",
+                    scanned_path.display()
+                )
+            });
+        } else if expand_tilde(&root.path) == scanned_path {
+            root.error = None;
+        }
+
+        render::spawn_graph_nodes(&mut commands, &mut meshes, &mut materials, &graph);
+    }
 
     for entity in &text_q {
         commands.entity(entity).despawn();

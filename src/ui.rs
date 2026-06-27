@@ -6,6 +6,7 @@ use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 use crate::{
     interaction::{HighlightMaterial, OriginalMaterial, Selected},
     render::{GraphData, NodeRef},
+    root::{expand_tilde, PendingRescan, RootConfig},
 };
 
 #[derive(Resource, Default)]
@@ -44,6 +45,8 @@ pub fn search_panel(
     graph: Res<GraphData>,
     selected: Res<Selected>,
     mut target: ResMut<SearchTarget>,
+    mut root: ResMut<RootConfig>,
+    mut pending_rescan: ResMut<PendingRescan>,
     highlight: Res<HighlightMaterial>,
     mut nodes: Query<(
         Entity,
@@ -54,12 +57,25 @@ pub fn search_panel(
     )>,
 ) -> Result {
     let mut changed = false;
+    let mut rescan_clicked = false;
     let displayed = selected.0.or(search.first_match);
 
     // ponytail: egui 0.34 marca Panel::show deprecated por churn de API, pero show(ctx)
     // sigue siendo la forma correcta para un panel top-level sobre el Context.
     #[allow(deprecated)]
     egui::TopBottomPanel::top("search").show(contexts.ctx_mut()?, |ui| {
+        ui.horizontal(|ui| {
+            ui.label("Raíz");
+            ui.text_edit_singleline(&mut root.path);
+            rescan_clicked = ui.button("Reescanear").clicked();
+        });
+
+        if let Some(error) = &root.error {
+            ui.colored_label(egui::Color32::from_rgb(255, 96, 96), error);
+        }
+
+        ui.separator();
+
         ui.horizontal(|ui| {
             ui.label("Buscar");
             let response = ui.text_edit_singleline(&mut search.query);
@@ -70,6 +86,20 @@ pub fn search_panel(
             ui.label(id.path.display().to_string());
         }
     });
+
+    if rescan_clicked {
+        let root_path = expand_tilde(&root.path);
+        if root_path.is_dir() {
+            root.error = None;
+            pending_rescan.0 = Some(root_path);
+        } else {
+            root.error = Some(format!(
+                "La ruta no existe o no es un directorio: {}",
+                root_path.display()
+            ));
+            pending_rescan.0 = None;
+        }
+    }
 
     if !changed {
         return Ok(());

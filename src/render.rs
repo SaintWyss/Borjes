@@ -12,6 +12,17 @@ pub struct GraphData(pub Vec<FolderNode>);
 #[derive(Component)]
 pub struct NodeRef(pub usize);
 
+const MIN_NODE_SCALE: f32 = 0.5;
+const MAX_NODE_SCALE: f32 = 3.0;
+const NODE_SCALE_DIVISOR: f32 = 8.0;
+
+pub fn node_scale(child_count: usize) -> f32 {
+    let normalized = (child_count as f32).sqrt() / NODE_SCALE_DIVISOR;
+    let scale = MIN_NODE_SCALE + (MAX_NODE_SCALE - MIN_NODE_SCALE) * normalized.min(1.0);
+
+    scale.clamp(MIN_NODE_SCALE, MAX_NODE_SCALE)
+}
+
 #[allow(dead_code)]
 pub fn seed_random_positions(nodes: &mut [FolderNode]) {
     let mut rng = rand::thread_rng();
@@ -42,21 +53,32 @@ pub fn spawn_graph_nodes(
     graph: &GraphData,
 ) {
     let sphere = meshes.add(Sphere::new(0.5));
+    let symlink_color = Color::srgb(1.0, 0.0, 0.95);
+    let symlink_material = materials.add(StandardMaterial {
+        base_color: symlink_color,
+        emissive: symlink_color.to_linear(),
+        unlit: true,
+        ..default()
+    });
     let mut cluster_materials: HashMap<usize, Handle<StandardMaterial>> = HashMap::new();
 
     for node in &graph.0 {
-        let material = match cluster_materials.get(&node.root_group) {
-            Some(material) => material.clone(),
-            None => {
-                let color = cluster_color(cluster_materials.len());
-                let material = materials.add(StandardMaterial {
-                    base_color: color,
-                    emissive: color.to_linear(),
-                    unlit: true,
-                    ..default()
-                });
-                cluster_materials.insert(node.root_group, material.clone());
-                material
+        let material = if node.is_symlink {
+            symlink_material.clone()
+        } else {
+            match cluster_materials.get(&node.root_group) {
+                Some(material) => material.clone(),
+                None => {
+                    let color = cluster_color(cluster_materials.len());
+                    let material = materials.add(StandardMaterial {
+                        base_color: color,
+                        emissive: color.to_linear(),
+                        unlit: true,
+                        ..default()
+                    });
+                    cluster_materials.insert(node.root_group, material.clone());
+                    material
+                }
             }
         };
 
@@ -64,7 +86,8 @@ pub fn spawn_graph_nodes(
             Mesh3d(sphere.clone()),
             MeshMaterial3d(material.clone()),
             OriginalMaterial(material),
-            Transform::from_translation(Vec3::from_array(node.pos)),
+            Transform::from_translation(Vec3::from_array(node.pos))
+                .with_scale(Vec3::splat(node_scale(node.child_count))),
             NodeRef(node.id),
         ));
     }
@@ -90,16 +113,16 @@ pub fn draw_edges(mut gizmos: Gizmos, graph: Res<GraphData>) {
 
 fn cluster_color(index: usize) -> Color {
     const COLORS: &[(f32, f32, f32)] = &[
-        (0.90, 0.22, 0.27),
-        (0.12, 0.56, 1.00),
-        (0.24, 0.72, 0.36),
-        (1.00, 0.72, 0.20),
-        (0.78, 0.34, 0.92),
+        (0.95, 0.24, 0.32),
+        (0.16, 0.62, 1.00),
+        (0.20, 0.78, 0.38),
+        (1.00, 0.74, 0.18),
+        (0.70, 0.40, 1.00),
         (0.00, 0.78, 0.75),
-        (1.00, 0.42, 0.24),
-        (0.58, 0.72, 1.00),
-        (0.72, 0.90, 0.18),
-        (1.00, 0.36, 0.68),
+        (1.00, 0.46, 0.20),
+        (0.46, 0.58, 1.00),
+        (0.68, 0.92, 0.16),
+        (1.00, 0.34, 0.56),
     ];
 
     let (r, g, b) = COLORS[index % COLORS.len()];
@@ -111,6 +134,26 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+
+    #[test]
+    fn node_scale_zero_uses_minimum() {
+        assert_eq!(node_scale(0), MIN_NODE_SCALE);
+    }
+
+    #[test]
+    fn node_scale_grows_monotonically_with_sqrt_compression() {
+        assert!(node_scale(0) < node_scale(4));
+        assert!(node_scale(4) < node_scale(64));
+    }
+
+    #[test]
+    fn node_scale_clamps_to_supported_range() {
+        assert_eq!(node_scale(10_000), MAX_NODE_SCALE);
+
+        for child_count in [0, 1, 4, 64, 10_000, usize::MAX] {
+            assert!((MIN_NODE_SCALE..=MAX_NODE_SCALE).contains(&node_scale(child_count)));
+        }
+    }
 
     #[test]
     fn seed_random_positions_sets_all_nodes_inside_range() {

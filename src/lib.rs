@@ -5,5 +5,6 @@
 pub mod interaction;
 pub mod layout;
 pub mod render;
+pub mod root;
 pub mod scan;
 pub mod ui;
