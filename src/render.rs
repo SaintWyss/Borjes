@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::interaction::OriginalMaterial;
 use crate::scan::FolderNode;
 
 #[derive(Resource)]
 pub struct GraphData(pub Vec<FolderNode>);
 
 #[derive(Component)]
-#[allow(dead_code)]
 pub struct NodeRef(pub usize);
 
 #[allow(dead_code)]
@@ -62,7 +62,8 @@ pub fn spawn_graph_nodes(
 
         commands.spawn((
             Mesh3d(sphere.clone()),
-            MeshMaterial3d(material),
+            MeshMaterial3d(material.clone()),
+            OriginalMaterial(material),
             Transform::from_translation(Vec3::from_array(node.pos)),
             NodeRef(node.id),
         ));

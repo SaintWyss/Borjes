@@ -9,6 +9,9 @@ path = "src/main.rs"
 
 [dependencies]
 bevy = "0.19"
+bevy_egui = "0.40.1"
 bevy_panorbit_camera = "0.35"
 ignore = "0.4"
+open = "5.3.5"
 rand = "0.8"
+unicode-normalization = "0.1"

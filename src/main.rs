@@ -1,10 +1,16 @@
+// Lints idiomáticos en Bevy (Query tuples + system-params). Allow a nivel crate.
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
+
+mod interaction;
 mod layout;
 mod render;
 mod scan;
+mod ui;
 
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, poll_once, AsyncComputeTaskPool, Task};
+use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use std::path::PathBuf;
 
@@ -22,14 +28,41 @@ fn main() {
     let nodes = scan::scan_folder(&data_path);
 
     App::new()
-        .add_plugins((DefaultPlugins, MeshPickingPlugin, PanOrbitCameraPlugin))
+        .add_plugins((
+            DefaultPlugins,
+            MeshPickingPlugin,
+            EguiPlugin::default(),
+            PanOrbitCameraPlugin,
+        ))
         .insert_resource(render::GraphData(nodes))
+        .insert_resource(interaction::Selected(None))
+        .insert_resource(ui::SearchState::default())
+        .insert_resource(ui::SearchTarget::default())
         .add_systems(Startup, (setup_camera, start_layout))
-        .add_systems(Update, (apply_layout, render::draw_edges))
+        .add_systems(EguiPrimaryContextPass, ui::search_panel)
+        .add_systems(
+            Update,
+            (
+                apply_layout,
+                render::draw_edges,
+                ui::animate_camera_to_target,
+            ),
+        )
+        .add_observer(interaction::on_node_over)
+        .add_observer(interaction::on_node_out)
+        .add_observer(interaction::on_node_click)
         .run();
 }
 
-fn setup_camera(mut commands: Commands) {
+fn setup_camera(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
+    let highlight = materials.add(StandardMaterial {
+        base_color: Color::WHITE,
+        emissive: Color::WHITE.to_linear(),
+        unlit: true,
+        ..default()
+    });
+    commands.insert_resource(interaction::HighlightMaterial(highlight));
+
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(0.0, 0.0, 150.0).looking_at(Vec3::ZERO, Vec3::Y),
