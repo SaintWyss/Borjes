@@ -21,11 +21,15 @@ Plans:
 **Goal:** App Bevy que dibuja los nodos como esferas y los edges, navegable con cámara orbital.
 **Mode:** mvp
 **Requirements:** GRAPH-01, CAM-01
+**Plans:** 1 plan
 **Success Criteria**:
 1. La ventana abre y muestra ~4600 esferas (posiciones random por ahora) + edges padre→hijo
 2. Cámara orbital funciona: rotar, zoom, pan con mouse
 3. Corre fluido (≥60 fps) con MeshPickingPlugin ya cargado
 4. Un solo mesh handle compartido + material por cluster (≤10 draw calls de nodos)
+
+Plans:
+- [ ] 02-01-PLAN.md — Cargo deps (bevy/panorbit/rand) + render.rs (spawn esferas mesh compartido + material por cluster + edges gizmos) + main.rs (App con MeshPickingPlugin + cámara orbital)
 
 ### Phase 3: Layout galaxia (force-directed)
 **Goal:** Las posiciones random se reemplazan por un layout que separa visualmente cada área-raíz en su cúmulo.
