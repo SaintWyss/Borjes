@@ -145,9 +145,14 @@ pub fn animate_camera_to_target(
         return;
     };
 
+    // Acercar de verdad: además de recentrar el foco, bajar el radio de órbita
+    // (zoom in). Sin esto la cámara recentra pero queda lejos ("vuela apenitas").
+    const SEARCH_ZOOM_RADIUS: f32 = 10.0;
+
     let mut reached = false;
     for mut camera in &mut cameras {
         camera.target_focus = position;
+        camera.target_radius = SEARCH_ZOOM_RADIUS;
         reached |= camera.focus.distance(position) < 0.5;
     }
 
