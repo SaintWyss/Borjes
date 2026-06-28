@@ -5,6 +5,7 @@
 pub mod desktop;
 pub mod interaction;
 pub mod layout;
+pub mod nav;
 pub mod pins;
 pub mod render;
 pub mod root;

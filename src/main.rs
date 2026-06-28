@@ -4,6 +4,7 @@
 mod desktop;
 mod interaction;
 mod layout;
+mod nav;
 mod pins;
 mod render;
 mod root;
