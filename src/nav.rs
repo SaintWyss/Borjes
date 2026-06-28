@@ -3,21 +3,14 @@ use std::path::Path;
 
 use crate::scan::FolderNode;
 
-// F11 drill-down render wires these values after the pure model phase.
-#[allow(dead_code)]
 pub const RADIAL_BASE: f32 = 6.0;
-#[allow(dead_code)]
 pub const RADIAL_PER_CHILD: f32 = 0.4;
 
-// F11 drill-down render wires FolderTree into runtime navigation.
-#[allow(dead_code)]
 pub struct FolderTree {
     nodes: Vec<FolderNode>,
     children: Vec<Vec<usize>>,
 }
 
-// F11 drill-down render wires FolderTree into runtime navigation.
-#[allow(dead_code)]
 impl FolderTree {
     pub fn from_nodes(nodes: Vec<FolderNode>) -> FolderTree {
         let mut children = vec![Vec::new(); nodes.len()];
@@ -52,6 +45,7 @@ impl FolderTree {
             .map(|node| node.id)
     }
 
+    #[allow(dead_code)]
     pub fn find_by_path(&self, path: &Path) -> Option<usize> {
         self.nodes
             .iter()
@@ -59,6 +53,7 @@ impl FolderTree {
             .map(|node| node.id)
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
@@ -68,8 +63,6 @@ impl FolderTree {
     }
 }
 
-// F11 drill-down render consumes per-level child positions.
-#[allow(dead_code)]
 pub fn radial_layout(n: usize) -> Vec<Vec2> {
     if n == 0 {
         return Vec::new();

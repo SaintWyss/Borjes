@@ -2,6 +2,7 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 mod desktop;
+mod drill;
 mod interaction;
 mod layout;
 mod nav;
@@ -11,13 +12,14 @@ mod root;
 mod scan;
 mod ui;
 
+use bevy::camera::ScalingMode;
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, poll_once, AsyncComputeTaskPool, Task};
 use bevy::window::{MonitorSelection, Window, WindowMode, WindowPlugin};
 use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
-use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -26,12 +28,14 @@ use crate::root::{expand_tilde, PendingRescan, RootConfig};
 use crate::scan::FolderNode;
 
 #[derive(Resource)]
+#[allow(dead_code)]
 struct LayoutTask {
     task: Task<Vec<FolderNode>>,
     root_path: PathBuf,
 }
 
 #[derive(Component)]
+#[allow(dead_code)]
 struct LayoutText;
 
 fn main() {
@@ -74,7 +78,7 @@ fn main() {
                 setup_camera,
                 render::setup_file_assets,
                 render::setup_pin_assets,
-                start_layout,
+                init_nav,
             ),
         )
         .add_systems(EguiPrimaryContextPass, (ui::search_panel, ui::pin_menu))
@@ -83,16 +87,15 @@ fn main() {
             (
                 toggle_overlay_visibility,
                 handle_rescan,
-                apply_layout,
-                interaction::apply_pins,
-                render::draw_edges,
+                drill::ascend,
+                drill::render_level,
                 ui::animate_camera_to_target,
             )
                 .chain(),
         )
         .add_observer(interaction::on_node_over)
         .add_observer(interaction::on_node_out)
-        .add_observer(interaction::on_node_click)
+        .add_observer(drill::on_level_click)
         .run();
 }
 
@@ -107,13 +110,13 @@ fn setup_camera(mut commands: Commands, mut materials: ResMut<Assets<StandardMat
 
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 0.0, 150.0).looking_at(Vec3::ZERO, Vec3::Y),
-        // Pan on middle mouse so right-click is free for the pin context menu
-        // (default button_pan is Right, which swallowed the Secondary click).
-        PanOrbitCamera {
-            button_pan: MouseButton::Middle,
-            ..default()
-        },
+        Projection::from(OrthographicProjection {
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 90.0,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_xyz(0.0, 0.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
     commands.spawn((
@@ -122,10 +125,38 @@ fn setup_camera(mut commands: Commands, mut materials: ResMut<Assets<StandardMat
     ));
 }
 
+fn init_nav(mut commands: Commands, mut root: ResMut<RootConfig>) {
+    let root_path = expand_tilde(&root.path);
+    let nodes = scan::scan_folder(&root_path);
+    let tree = nav::FolderTree::from_nodes(nodes);
+    let current = tree.root().unwrap_or(0);
+
+    root.error = if tree.is_empty() {
+        Some(if root_path.is_dir() {
+            format!("No se encontraron carpetas en {}", root_path.display())
+        } else {
+            format!(
+                "La ruta no existe o no es un directorio: {}",
+                root_path.display()
+            )
+        })
+    } else {
+        None
+    };
+
+    commands.insert_resource(drill::NavState {
+        tree,
+        current,
+        dirty: true,
+    });
+}
+
+#[allow(dead_code)]
 fn start_layout(mut commands: Commands, root: Res<RootConfig>) {
     start_layout_task(&mut commands, expand_tilde(&root.path));
 }
 
+#[allow(dead_code)]
 fn start_layout_task(commands: &mut Commands, root_path: PathBuf) {
     let task_root_path = root_path.clone();
     let pool = AsyncComputeTaskPool::get();
@@ -158,10 +189,11 @@ fn start_layout_task(commands: &mut Commands, root_path: PathBuf) {
 fn handle_rescan(
     mut commands: Commands,
     mut pending: ResMut<PendingRescan>,
-    task: Option<Res<LayoutTask>>,
     node_entities: Query<Entity, With<render::NodeRef>>,
+    level_entities: Query<Entity, With<drill::LevelNode>>,
     file_entities: Query<Entity, With<interaction::FileNode>>,
     expanded_folders: Query<Entity, With<interaction::Expanded>>,
+    mut nav: ResMut<drill::NavState>,
     mut selected: ResMut<interaction::Selected>,
     mut search: ResMut<ui::SearchState>,
     mut target: ResMut<ui::SearchTarget>,
@@ -172,12 +204,10 @@ fn handle_rescan(
         return;
     };
 
-    if task.is_some() {
-        pending.0 = Some(root_path);
-        return;
-    }
-
     for entity in &node_entities {
+        commands.entity(entity).despawn();
+    }
+    for entity in &level_entities {
         commands.entity(entity).despawn();
     }
     // Files are absolute siblings, not ChildOf children — despawn them explicitly
@@ -194,11 +224,31 @@ fn handle_rescan(
     target.0 = None;
     graph.0.clear();
     root.path = root_path.display().to_string();
-    root.error = None;
+    let nodes = scan::scan_folder(&root_path);
+    let tree = nav::FolderTree::from_nodes(nodes);
+    let current = tree.root().unwrap_or(0);
 
-    start_layout_task(&mut commands, root_path);
+    root.error = if tree.is_empty() {
+        Some(if root_path.is_dir() {
+            format!("No se encontraron carpetas en {}", root_path.display())
+        } else {
+            format!(
+                "La ruta no existe o no es un directorio: {}",
+                root_path.display()
+            )
+        })
+    } else {
+        None
+    };
+
+    *nav = drill::NavState {
+        tree,
+        current,
+        dirty: true,
+    };
 }
 
+#[allow(dead_code)]
 fn apply_layout(
     mut commands: Commands,
     task: Option<ResMut<LayoutTask>>,

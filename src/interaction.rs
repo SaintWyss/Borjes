@@ -81,6 +81,7 @@ pub fn on_node_out(
     };
 }
 
+#[allow(dead_code)]
 pub fn on_node_click(
     trigger: On<Pointer<Click>>,
     mut contexts: EguiContexts,
@@ -206,6 +207,7 @@ pub fn clear_pin_visual(commands: &mut Commands, entity: Entity, pinned: &Pinned
 // PinStore. `Without<Pinned>` filters out already-gold nodes so the system
 // stays cheap. Covers BOTH startup load (PIN-02) and Reescanear (PIN-03):
 // after either, pinned folders exist again as plain NodeRef entities.
+#[allow(dead_code)]
 pub fn apply_pins(
     mut commands: Commands,
     pin_store: Res<crate::pins::PinStore>,

@@ -3,6 +3,7 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 pub mod desktop;
+pub mod drill;
 pub mod interaction;
 pub mod layout;
 pub mod nav;

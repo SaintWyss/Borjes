@@ -155,6 +155,7 @@ pub fn spawn_graph_nodes(
     }
 }
 
+#[allow(dead_code)]
 pub fn draw_edges(mut gizmos: Gizmos, graph: Res<GraphData>) {
     for node in &graph.0 {
         let Some(parent_id) = node.parent_id else {
