@@ -83,6 +83,7 @@ fn main() {
                 toggle_overlay_visibility,
                 handle_rescan,
                 apply_layout,
+                interaction::apply_pins,
                 render::draw_edges,
                 ui::animate_camera_to_target,
             )

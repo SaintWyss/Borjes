@@ -195,6 +195,27 @@ pub fn clear_pin_visual(commands: &mut Commands, entity: Entity, pinned: &Pinned
     commands.entity(entity).remove::<Pinned>();
 }
 
+// Re-mark freshly spawned folder nodes gold if their path is in the loaded
+// PinStore. `Without<Pinned>` filters out already-gold nodes so the system
+// stays cheap. Covers BOTH startup load (PIN-02) and Reescanear (PIN-03):
+// after either, pinned folders exist again as plain NodeRef entities.
+pub fn apply_pins(
+    mut commands: Commands,
+    pin_store: Res<crate::pins::PinStore>,
+    pin_assets: Res<render::PinAssets>,
+    graph: Res<GraphData>,
+    nodes: Query<(Entity, &NodeRef, &OriginalMaterial), Without<Pinned>>,
+) {
+    for (entity, node_ref, original) in &nodes {
+        let Some(node) = graph.0.get(node_ref.0) else {
+            continue;
+        };
+        if pin_store.0.contains(&node.path) {
+            apply_pin_visual(&mut commands, entity, &original.0, &pin_assets.material);
+        }
+    }
+}
+
 fn spawn_file_burst(
     folder_entity: Entity,
     parent_pos: Vec3,
