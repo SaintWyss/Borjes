@@ -27,6 +27,12 @@ pub struct FileAssets {
     pub material: Handle<StandardMaterial>,
 }
 
+#[derive(Resource)]
+#[allow(dead_code)] // Material is consumed by 08-02 live pinning and 08-03 re-marking.
+pub struct PinAssets {
+    pub material: Handle<StandardMaterial>,
+}
+
 pub fn node_scale(child_count: usize) -> f32 {
     let normalized = (child_count as f32).sqrt() / NODE_SCALE_DIVISOR;
     let scale = MIN_NODE_SCALE + (MAX_NODE_SCALE - MIN_NODE_SCALE) * normalized.min(1.0);
@@ -49,6 +55,20 @@ pub fn setup_file_assets(
     });
 
     commands.insert_resource(FileAssets { mesh, material });
+}
+
+pub fn setup_pin_assets(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
+    // PIN-03: one shared gold material marks every pinned folder without
+    // per-node material churn; pinned nodes keep their sphere mesh.
+    let gold = Color::srgb(1.0, 0.84, 0.0);
+    let material = materials.add(StandardMaterial {
+        base_color: gold,
+        emissive: gold.to_linear(),
+        unlit: true,
+        ..default()
+    });
+
+    commands.insert_resource(PinAssets { material });
 }
 
 pub fn fibonacci_offset(i: usize, n: usize) -> Vec3 {

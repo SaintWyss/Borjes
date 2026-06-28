@@ -4,6 +4,7 @@
 mod desktop;
 mod interaction;
 mod layout;
+mod pins;
 mod render;
 mod root;
 mod scan;
@@ -62,6 +63,7 @@ fn main() {
         .insert_resource(RootConfig::default())
         .insert_resource(PendingRescan::default())
         .insert_resource(interaction::Selected(None))
+        .insert_resource(pins::PinStore(pins::load_pins()))
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
         .add_systems(
@@ -69,6 +71,7 @@ fn main() {
             (
                 setup_camera,
                 render::setup_file_assets,
+                render::setup_pin_assets,
                 start_layout,
             ),
         )
