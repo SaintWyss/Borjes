@@ -37,6 +37,14 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 | 8 | Pins + persistencia | ✅ COMPLETA (right-click→Pin/Unpin dorado, pins.json std-only, sobrevive rescan/restart; pan→botón medio) |
 | 9 | Autostart + integración | ✅ COMPLETA (autostart KDE lanza overlay oculto al login; op 018 sync-control) |
 
+## v3 — NEURA (drill-down + 2.5D; glow→v4) — spec docs/superpowers/specs/2026-06-28-neura-v3-design.md
+| # | Phase | Status |
+|---|-------|--------|
+| 10 | Modelo nav + layout radial | ✅ COMPLETA (FolderTree índice + radial_layout determinista; 10 tests; pura lógica) |
+| 11 | Drill-down render + cámara orto + FSM | pending (próxima) |
+| 12 | Labels egui + breadcrumb + parent-ghost | pending |
+| 13 | Buscador-teletransporte + pins salto-al-pin | pending |
+
 ## Notes
 - Cross-AI: Codex construye vía codex-gsd-exec, Claude verifica (cargo build/test/clippy) + commitea.
 - Planner GSD = **opus** (no sonnet).
