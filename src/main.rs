@@ -145,6 +145,8 @@ fn handle_rescan(
     mut pending: ResMut<PendingRescan>,
     task: Option<Res<LayoutTask>>,
     node_entities: Query<Entity, With<render::NodeRef>>,
+    file_entities: Query<Entity, With<interaction::FileNode>>,
+    expanded_folders: Query<Entity, With<interaction::Expanded>>,
     mut selected: ResMut<interaction::Selected>,
     mut search: ResMut<ui::SearchState>,
     mut target: ResMut<ui::SearchTarget>,
@@ -162,6 +164,14 @@ fn handle_rescan(
 
     for entity in &node_entities {
         commands.entity(entity).despawn();
+    }
+    // Files are absolute siblings, not ChildOf children — despawn them explicitly
+    // so no gray cube survives a reroot (07-03).
+    for entity in &file_entities {
+        commands.entity(entity).despawn();
+    }
+    for entity in &expanded_folders {
+        commands.entity(entity).remove::<interaction::Expanded>();
     }
 
     selected.0 = None;
