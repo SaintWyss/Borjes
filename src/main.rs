@@ -61,7 +61,12 @@ fn main() {
         .insert_resource(ui::SearchTarget::default())
         .add_systems(
             Startup,
-            (install_signal_handler, setup_camera, start_layout),
+            (
+                install_signal_handler,
+                setup_camera,
+                render::setup_file_assets,
+                start_layout,
+            ),
         )
         .add_systems(EguiPrimaryContextPass, ui::search_panel)
         .add_systems(

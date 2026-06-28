@@ -16,11 +16,57 @@ const MIN_NODE_SCALE: f32 = 0.5;
 const MAX_NODE_SCALE: f32 = 3.0;
 const NODE_SCALE_DIVISOR: f32 = 8.0;
 
+// File nodes are deliberately smaller than MIN_NODE_SCALE so they read as leaves.
+#[allow(dead_code)] // consumed by plan 07-02
+pub const FILE_NODE_SCALE: f32 = 0.35;
+// Must clear MAX_NODE_SCALE so burst files are not buried in the parent folder.
+#[allow(dead_code)] // consumed by plan 07-02
+pub const BURST_RADIUS: f32 = 4.0;
+
+#[derive(Resource)]
+#[allow(dead_code)] // fields read by plan 07-02 burst spawn
+pub struct FileAssets {
+    pub mesh: Handle<Mesh>,
+    pub material: Handle<StandardMaterial>,
+}
+
 pub fn node_scale(child_count: usize) -> f32 {
     let normalized = (child_count as f32).sqrt() / NODE_SCALE_DIVISOR;
     let scale = MIN_NODE_SCALE + (MAX_NODE_SCALE - MIN_NODE_SCALE) * normalized.min(1.0);
 
     scale.clamp(MIN_NODE_SCALE, MAX_NODE_SCALE)
+}
+
+pub fn setup_file_assets(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mesh = meshes.add(Cuboid::new(0.4, 0.4, 0.4));
+    let gray = Color::srgb(0.6, 0.6, 0.62);
+    let material = materials.add(StandardMaterial {
+        base_color: gray,
+        emissive: gray.to_linear(),
+        unlit: true,
+        ..default()
+    });
+
+    commands.insert_resource(FileAssets { mesh, material });
+}
+
+#[allow(dead_code)] // consumed by plan 07-02
+pub fn fibonacci_offset(i: usize, n: usize) -> Vec3 {
+    let golden_angle = std::f32::consts::PI * (3.0 - 5.0_f32.sqrt());
+    let y = if n <= 1 {
+        0.0
+    } else {
+        1.0 - (i as f32 / (n - 1) as f32) * 2.0
+    };
+    let ring_radius = (1.0 - y * y).max(0.0).sqrt();
+    let theta = i as f32 * golden_angle;
+
+    // Callers must special-case n == 1 with Vec3::Y * BURST_RADIUS to avoid overlap.
+    Vec3::new(theta.cos() * ring_radius, y, theta.sin() * ring_radius)
 }
 
 #[allow(dead_code)]

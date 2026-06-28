@@ -16,6 +16,12 @@ const EXCLUDED: &[&str] = &[
     ".Trash",
 ];
 
+#[allow(dead_code)] // fields read by plan 07-02 burst spawn / open
+pub struct FileEntry {
+    pub path: PathBuf,
+    pub name: String,
+}
+
 pub struct FolderNode {
     pub id: usize,
     pub path: PathBuf,
@@ -162,12 +168,114 @@ pub fn scan_folder(root: &Path) -> Vec<FolderNode> {
     nodes
 }
 
+#[allow(dead_code)] // wired into interaction.rs in plan 07-02
+pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
+    let scan_root = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let Ok(entries) = std::fs::read_dir(scan_root) else {
+        return Vec::new();
+    };
+
+    entries
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let name = entry.file_name().to_str()?.to_string();
+
+            if name.starts_with('.') || EXCLUDED.contains(&name.as_str()) {
+                return None;
+            }
+
+            let file_type = entry.file_type().ok()?;
+            if !file_type.is_file() {
+                return None;
+            }
+
+            Some(FileEntry {
+                path: entry.path(),
+                name,
+            })
+        })
+        // Locked soft cap for FILE-04: keep each burst bounded in huge directories.
+        .take(200)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::{self, File};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn data_path() -> PathBuf {
         PathBuf::from(std::env::var("HOME").expect("HOME not set")).join("Data")
+    }
+
+    fn temp_scan_dir(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before UNIX_EPOCH")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "datatree-rs-{name}-{}-{unique}",
+            std::process::id()
+        ));
+
+        fs::create_dir(&path).expect("failed to create temp scan dir");
+        path
+    }
+
+    #[test]
+    fn scan_files_returns_files_only_one_level() {
+        let dir = temp_scan_dir("files-only");
+        File::create(dir.join("alpha.txt")).expect("failed to create alpha.txt");
+        fs::create_dir(dir.join("nested")).expect("failed to create nested dir");
+        File::create(dir.join("nested").join("beta.txt")).expect("failed to create beta.txt");
+
+        let files = scan_files(&dir);
+        let names: Vec<&str> = files.iter().map(|file| file.name.as_str()).collect();
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(names, ["alpha.txt"]);
+        assert!(files[0].path.is_absolute());
+
+        fs::remove_dir_all(dir).expect("failed to clean temp scan dir");
+    }
+
+    #[test]
+    fn scan_files_excludes_dotfiles_and_excluded_names() {
+        let dir = temp_scan_dir("hidden-excluded");
+        File::create(dir.join("visible.txt")).expect("failed to create visible.txt");
+        File::create(dir.join(".secret")).expect("failed to create dotfile");
+        File::create(dir.join("target")).expect("failed to create excluded file");
+
+        let files = scan_files(&dir);
+        let names: Vec<&str> = files.iter().map(|file| file.name.as_str()).collect();
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(names, ["visible.txt"]);
+
+        fs::remove_dir_all(dir).expect("failed to clean temp scan dir");
+    }
+
+    #[test]
+    fn scan_files_caps_results_at_200() {
+        let dir = temp_scan_dir("cap");
+        for index in 0..250 {
+            File::create(dir.join(format!("file-{index:03}.txt"))).expect("failed to create file");
+        }
+
+        let files = scan_files(&dir);
+
+        assert_eq!(files.len(), 200);
+
+        fs::remove_dir_all(dir).expect("failed to clean temp scan dir");
+    }
+
+    #[test]
+    fn scan_files_returns_empty_for_missing_dir() {
+        let dir = std::env::temp_dir().join(format!("datatree-rs-missing-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+
+        assert!(scan_files(&dir).is_empty());
     }
 
     #[test]
