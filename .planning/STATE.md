@@ -34,8 +34,8 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 |---|-------|--------|
 | 6 | Ventana Desktop → overlay on-demand | ✅ COMPLETA (spike→overlay toggle Meta+1; idle 0.6%) |
 | 7 | Archivos on-demand | ✅ COMPLETA (click→burst cubos grises, native click-count, rescan teardown; 50 tests) |
-| 8 | Pins + persistencia | pending (próxima) |
-| 9 | Autostart + integración | pending |
+| 8 | Pins + persistencia | ✅ COMPLETA (right-click→Pin/Unpin dorado, pins.json std-only, sobrevive rescan/restart; pan→botón medio) |
+| 9 | Autostart + integración | pending (próxima) |
 
 ## Notes
 - Cross-AI: Codex construye vía codex-gsd-exec, Claude verifica (cargo build/test/clippy) + commitea.
