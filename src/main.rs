@@ -33,6 +33,11 @@ struct LayoutTask {
 struct LayoutText;
 
 fn main() {
+    // Install the SIGUSR1 handler BEFORE Bevy builds (window/GPU init takes
+    // ~1-2s). Otherwise a USR1 arriving in that window hits the default
+    // disposition (terminate) and the overlay dies — "se cierra y no abre".
+    install_signal_handler();
+
     App::new()
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
@@ -62,7 +67,6 @@ fn main() {
         .add_systems(
             Startup,
             (
-                install_signal_handler,
                 setup_camera,
                 render::setup_file_assets,
                 start_layout,
