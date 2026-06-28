@@ -20,6 +20,19 @@ pub struct HighlightMaterial(pub Handle<StandardMaterial>);
 pub struct OriginalMaterial(pub Handle<StandardMaterial>);
 
 #[derive(Component)]
+pub struct Pinned {
+    pub original: Handle<StandardMaterial>,
+}
+
+#[derive(Resource, Default)]
+pub struct PinMenu {
+    pub open: bool,
+    pub path: Option<PathBuf>,
+    pub entity: Option<Entity>,
+    pub pos: Vec2,
+}
+
+#[derive(Component)]
 pub struct FileNode {
     pub parent: Entity,
     pub path: PathBuf,
@@ -67,8 +80,10 @@ pub fn on_node_click(
     trigger: On<Pointer<Click>>,
     mut contexts: EguiContexts,
     mut selected: ResMut<Selected>,
+    mut pin_menu: ResMut<PinMenu>,
     graph: Res<GraphData>,
     nodes: Query<&NodeRef>,
+    windows: Query<&Window>,
     folder_transforms: Query<&Transform>,
     files: Query<(Entity, &FileNode)>,
     expanded: Query<(), With<Expanded>>,
@@ -79,11 +94,29 @@ pub fn on_node_click(
         return Ok(());
     }
 
-    if trigger.button != PointerButton::Primary {
+    let entity = trigger.entity;
+
+    if trigger.button == PointerButton::Secondary {
+        if let Ok(node_ref) = nodes.get(entity) {
+            if let Some(node) = graph.0.get(node_ref.0) {
+                let pos = windows
+                    .iter()
+                    .next()
+                    .and_then(Window::cursor_position)
+                    .unwrap_or_default();
+                pin_menu.open = true;
+                pin_menu.path = Some(node.path.clone());
+                pin_menu.entity = Some(entity);
+                pin_menu.pos = pos;
+            }
+        }
+
         return Ok(());
     }
 
-    let entity = trigger.entity;
+    if trigger.button != PointerButton::Primary {
+        return Ok(());
+    }
 
     if let Ok(node_ref) = nodes.get(entity) {
         let Some(node) = graph.0.get(node_ref.0) else {
@@ -137,6 +170,29 @@ pub fn on_node_click(
     }
 
     Ok(())
+}
+
+pub fn apply_pin_visual(
+    commands: &mut Commands,
+    entity: Entity,
+    current_original: &Handle<StandardMaterial>,
+    gold: &Handle<StandardMaterial>,
+) {
+    commands.entity(entity).insert((
+        MeshMaterial3d(gold.clone()),
+        OriginalMaterial(gold.clone()),
+        Pinned {
+            original: current_original.clone(),
+        },
+    ));
+}
+
+pub fn clear_pin_visual(commands: &mut Commands, entity: Entity, pinned: &Pinned) {
+    commands.entity(entity).insert((
+        MeshMaterial3d(pinned.original.clone()),
+        OriginalMaterial(pinned.original.clone()),
+    ));
+    commands.entity(entity).remove::<Pinned>();
 }
 
 fn spawn_file_burst(

@@ -4,8 +4,9 @@ use bevy_panorbit_camera::PanOrbitCamera;
 use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
 use crate::{
-    interaction::{HighlightMaterial, OriginalMaterial, Selected},
-    render::{GraphData, NodeRef},
+    interaction::{self, HighlightMaterial, OriginalMaterial, Selected},
+    pins,
+    render::{self, GraphData, NodeRef},
     root::{expand_tilde, PendingRescan, RootConfig},
 };
 
@@ -133,6 +134,74 @@ pub fn search_panel(
 
     search.first_match = first_match.map(|(id, _)| id);
     target.0 = first_match.map(|(_, position)| position);
+
+    Ok(())
+}
+
+pub fn pin_menu(
+    mut commands: Commands,
+    mut contexts: EguiContexts,
+    mut pin_menu: ResMut<interaction::PinMenu>,
+    mut pin_store: ResMut<pins::PinStore>,
+    pin_assets: Res<render::PinAssets>,
+    originals: Query<&interaction::OriginalMaterial>,
+    pinned_q: Query<&interaction::Pinned>,
+) -> Result {
+    if !pin_menu.open {
+        return Ok(());
+    }
+
+    let Some(path) = pin_menu.path.take() else {
+        pin_menu.open = false;
+        return Ok(());
+    };
+    let Some(entity) = pin_menu.entity.take() else {
+        pin_menu.open = false;
+        return Ok(());
+    };
+
+    let is_pinned = pin_store.0.contains(&path);
+    let pos = pin_menu.pos;
+    let ctx = contexts.ctx_mut()?;
+    let style = ctx.global_style();
+    let mut clicked = false;
+
+    let area_response = egui::Area::new(egui::Id::new("pin_menu"))
+        .fixed_pos(egui::pos2(pos.x, pos.y))
+        .show(ctx, |ui| {
+            egui::Frame::menu(&style).show(ui, |ui| {
+                let label = if is_pinned { "Unpin" } else { "Pin" };
+                clicked = ui.button(label).clicked();
+            });
+        });
+    let dismissed = area_response.response.clicked_elsewhere();
+
+    if clicked {
+        if is_pinned {
+            pin_store.0.remove(&path);
+            if let Ok(pinned) = pinned_q.get(entity) {
+                interaction::clear_pin_visual(&mut commands, entity, pinned);
+            }
+        } else {
+            pin_store.0.insert(path.clone());
+            if let Ok(original) = originals.get(entity) {
+                interaction::apply_pin_visual(
+                    &mut commands,
+                    entity,
+                    &original.0,
+                    &pin_assets.material,
+                );
+            }
+        }
+
+        pins::save_pins(&pin_store.0);
+        pin_menu.open = false;
+    } else if dismissed {
+        pin_menu.open = false;
+    } else {
+        pin_menu.path = Some(path);
+        pin_menu.entity = Some(entity);
+    }
 
     Ok(())
 }

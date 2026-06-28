@@ -63,6 +63,7 @@ fn main() {
         .insert_resource(RootConfig::default())
         .insert_resource(PendingRescan::default())
         .insert_resource(interaction::Selected(None))
+        .insert_resource(interaction::PinMenu::default())
         .insert_resource(pins::PinStore(pins::load_pins()))
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
@@ -75,7 +76,7 @@ fn main() {
                 start_layout,
             ),
         )
-        .add_systems(EguiPrimaryContextPass, ui::search_panel)
+        .add_systems(EguiPrimaryContextPass, (ui::search_panel, ui::pin_menu))
         .add_systems(
             Update,
             (
