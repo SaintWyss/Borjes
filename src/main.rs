@@ -107,7 +107,12 @@ fn setup_camera(mut commands: Commands, mut materials: ResMut<Assets<StandardMat
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(0.0, 0.0, 150.0).looking_at(Vec3::ZERO, Vec3::Y),
-        PanOrbitCamera::default(),
+        // Pan on middle mouse so right-click is free for the pin context menu
+        // (default button_pan is Right, which swallowed the Secondary click).
+        PanOrbitCamera {
+            button_pan: MouseButton::Middle,
+            ..default()
+        },
     ));
 
     commands.spawn((

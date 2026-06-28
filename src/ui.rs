@@ -166,6 +166,7 @@ pub fn pin_menu(
     let style = ctx.global_style();
     let mut clicked = false;
 
+    let was_just_opened = std::mem::take(&mut pin_menu.just_opened);
     let area_response = egui::Area::new(egui::Id::new("pin_menu"))
         .fixed_pos(egui::pos2(pos.x, pos.y))
         .show(ctx, |ui| {
@@ -174,7 +175,8 @@ pub fn pin_menu(
                 clicked = ui.button(label).clicked();
             });
         });
-    let dismissed = area_response.response.clicked_elsewhere();
+    // Don't let the opening right-click dismiss the menu on its first frame.
+    let dismissed = !was_just_opened && area_response.response.clicked_elsewhere();
 
     if clicked {
         if is_pinned {

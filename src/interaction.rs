@@ -30,6 +30,11 @@ pub struct PinMenu {
     pub path: Option<PathBuf>,
     pub entity: Option<Entity>,
     pub pos: Vec2,
+    // True for the first frame after opening. The right-click that opens the
+    // menu is seen by egui as a click OUTSIDE the freshly-created Area, so
+    // clicked_elsewhere() would dismiss it on frame 1 before the user can
+    // click Pin. Skip the dismissal check while this is set.
+    pub just_opened: bool,
 }
 
 #[derive(Component)]
@@ -104,10 +109,12 @@ pub fn on_node_click(
                     .next()
                     .and_then(Window::cursor_position)
                     .unwrap_or_default();
+                info!("pin menu: {}", node.path.display());
                 pin_menu.open = true;
                 pin_menu.path = Some(node.path.clone());
                 pin_menu.entity = Some(entity);
                 pin_menu.pos = pos;
+                pin_menu.just_opened = true;
             }
         }
 
