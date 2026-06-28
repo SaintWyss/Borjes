@@ -123,6 +123,11 @@ Plans:
 2. Los pins se guardan en ~/.config/datatree-rs/pins.json y se cargan al arrancar
 3. Los pins sobreviven colapso/reescaneo (siempre visibles)
 4. Nodos pinneados con marca visual propia (borde/color dorado)
+**Plans:** 3 plans
+Plans:
+- [ ] 08-01-PLAN.md — PinStore + std-only pins.json persistence (atomic/resilient) + gold PinAssets
+- [ ] 08-02-PLAN.md — Right-click egui Pin/Unpin menu + toggle persists + live gold mark
+- [ ] 08-03-PLAN.md — apply_pins re-mark on load/rescan (survive restart) + tactile verification
 
 ### Phase 9: Autostart + integración escritorio
 **Goal:** La app arranca sola al login y queda como escritorio del usuario.
