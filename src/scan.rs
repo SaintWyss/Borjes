@@ -16,7 +16,6 @@ const EXCLUDED: &[&str] = &[
     ".Trash",
 ];
 
-#[allow(dead_code)] // fields read by plan 07-02 burst spawn / open
 pub struct FileEntry {
     pub path: PathBuf,
     pub name: String,
@@ -168,7 +167,6 @@ pub fn scan_folder(root: &Path) -> Vec<FolderNode> {
     nodes
 }
 
-#[allow(dead_code)] // wired into interaction.rs in plan 07-02
 pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
     let scan_root = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
     let Ok(entries) = std::fs::read_dir(scan_root) else {

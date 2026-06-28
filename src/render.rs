@@ -17,14 +17,11 @@ const MAX_NODE_SCALE: f32 = 3.0;
 const NODE_SCALE_DIVISOR: f32 = 8.0;
 
 // File nodes are deliberately smaller than MIN_NODE_SCALE so they read as leaves.
-#[allow(dead_code)] // consumed by plan 07-02
 pub const FILE_NODE_SCALE: f32 = 0.35;
 // Must clear MAX_NODE_SCALE so burst files are not buried in the parent folder.
-#[allow(dead_code)] // consumed by plan 07-02
 pub const BURST_RADIUS: f32 = 4.0;
 
 #[derive(Resource)]
-#[allow(dead_code)] // fields read by plan 07-02 burst spawn
 pub struct FileAssets {
     pub mesh: Handle<Mesh>,
     pub material: Handle<StandardMaterial>,
@@ -54,7 +51,6 @@ pub fn setup_file_assets(
     commands.insert_resource(FileAssets { mesh, material });
 }
 
-#[allow(dead_code)] // consumed by plan 07-02
 pub fn fibonacci_offset(i: usize, n: usize) -> Vec3 {
     let golden_angle = std::f32::consts::PI * (3.0 - 5.0_f32.sqrt());
     let y = if n <= 1 {

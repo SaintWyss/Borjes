@@ -1,10 +1,14 @@
-use std::time::{Duration, Instant};
+use std::path::{Path, PathBuf};
 
-use bevy::picking::prelude::{Click, Out, Over, Pointer};
+use bevy::picking::{
+    pointer::PointerButton,
+    prelude::{Click, Out, Over, Pointer},
+};
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 
-use crate::render::{GraphData, NodeRef};
+use crate::render::{self, FileAssets, GraphData, NodeRef};
+use crate::scan;
 
 #[derive(Resource)]
 pub struct Selected(pub Option<usize>);
@@ -15,10 +19,19 @@ pub struct HighlightMaterial(pub Handle<StandardMaterial>);
 #[derive(Component)]
 pub struct OriginalMaterial(pub Handle<StandardMaterial>);
 
+#[derive(Component)]
+pub struct FileNode {
+    pub parent: Entity,
+    pub path: PathBuf,
+}
+
+#[derive(Component)]
+pub struct Expanded;
+
 pub fn on_node_over(
     trigger: On<Pointer<Over>>,
     highlight: Res<HighlightMaterial>,
-    mut nodes: Query<&mut MeshMaterial3d<StandardMaterial>, With<NodeRef>>,
+    mut nodes: Query<&mut MeshMaterial3d<StandardMaterial>, Or<(With<NodeRef>, With<FileNode>)>>,
 ) {
     let Ok(mut material) = nodes.get_mut(trigger.entity) else {
         return;
@@ -36,7 +49,7 @@ pub fn on_node_out(
             &mut MeshMaterial3d<StandardMaterial>,
             Option<&crate::ui::SearchMatch>,
         ),
-        With<NodeRef>,
+        Or<(With<NodeRef>, With<FileNode>)>,
     >,
 ) {
     let Ok((original, mut material, search_match)) = nodes.get_mut(trigger.entity) else {
@@ -56,37 +69,134 @@ pub fn on_node_click(
     mut selected: ResMut<Selected>,
     graph: Res<GraphData>,
     nodes: Query<&NodeRef>,
-    mut last_click: Local<Option<(Instant, Entity)>>,
+    folder_transforms: Query<&Transform>,
+    files: Query<(Entity, &FileNode)>,
+    expanded: Query<(), With<Expanded>>,
+    file_assets: Res<FileAssets>,
+    mut commands: Commands,
 ) -> Result {
     if contexts.ctx_mut()?.is_pointer_over_egui() {
         return Ok(());
     }
 
+    if trigger.button != PointerButton::Primary {
+        return Ok(());
+    }
+
     let entity = trigger.entity;
-    let Ok(node_ref) = nodes.get(entity) else {
+
+    if let Ok(node_ref) = nodes.get(entity) {
+        let Some(node) = graph.0.get(node_ref.0) else {
+            return Ok(());
+        };
+
+        selected.0 = Some(node_ref.0);
+        info!("selected: {}", node.path.display());
+
+        if trigger.count >= 2 {
+            if expanded.get(entity).is_err() {
+                if let Ok(transform) = folder_transforms.get(entity) {
+                    spawn_file_burst(
+                        entity,
+                        transform.translation,
+                        &node.path,
+                        &file_assets,
+                        &mut commands,
+                    );
+                }
+            }
+
+            let path = node.path.clone();
+            std::thread::spawn(move || {
+                let _ = open::that(path);
+            });
+        } else if expanded.get(entity).is_ok() {
+            collapse_files(entity, &files, &mut commands);
+        } else if let Ok(transform) = folder_transforms.get(entity) {
+            spawn_file_burst(
+                entity,
+                transform.translation,
+                &node.path,
+                &file_assets,
+                &mut commands,
+            );
+        }
+
         return Ok(());
-    };
+    }
 
-    let Some(node) = graph.0.get(node_ref.0) else {
+    if let Ok((_, file)) = files.get(entity) {
+        if trigger.count >= 2 {
+            let path = file.path.clone();
+            std::thread::spawn(move || {
+                let _ = open::that(path);
+            });
+        }
+
         return Ok(());
-    };
-
-    selected.0 = Some(node_ref.0);
-    info!("selected: {}", node.path.display());
-
-    let is_double_click = last_click.as_ref().is_some_and(|(instant, previous)| {
-        *previous == entity && instant.elapsed() < Duration::from_millis(300)
-    });
-
-    if is_double_click {
-        let path = node.path.clone();
-        std::thread::spawn(move || {
-            let _ = open::that(path);
-        });
-        *last_click = None;
-    } else {
-        *last_click = Some((Instant::now(), entity));
     }
 
     Ok(())
+}
+
+fn spawn_file_burst(
+    folder_entity: Entity,
+    parent_pos: Vec3,
+    dir: &Path,
+    file_assets: &FileAssets,
+    commands: &mut Commands,
+) {
+    let entries = scan::scan_files(dir);
+    let n = entries.len();
+
+    for (i, entry) in entries.into_iter().enumerate() {
+        let offset = file_burst_offset(i, n);
+        commands.spawn((
+            Mesh3d(file_assets.mesh.clone()),
+            MeshMaterial3d(file_assets.material.clone()),
+            OriginalMaterial(file_assets.material.clone()),
+            Transform::from_translation(parent_pos + offset)
+                .with_scale(Vec3::splat(render::FILE_NODE_SCALE)),
+            Name::new(entry.name),
+            FileNode {
+                parent: folder_entity,
+                path: entry.path,
+            },
+        ));
+    }
+
+    commands.entity(folder_entity).insert(Expanded);
+}
+
+fn collapse_files(
+    folder_entity: Entity,
+    files: &Query<(Entity, &FileNode)>,
+    commands: &mut Commands,
+) {
+    for (file_entity, file) in files {
+        if file.parent == folder_entity {
+            commands.entity(file_entity).despawn();
+        }
+    }
+
+    commands.entity(folder_entity).remove::<Expanded>();
+}
+
+fn file_burst_offset(i: usize, n: usize) -> Vec3 {
+    let dir = if n == 1 {
+        Vec3::Y
+    } else {
+        render::fibonacci_offset(i, n)
+    };
+    dir * render::BURST_RADIUS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn single_file_burst_offsets_up_by_radius() {
+        assert_eq!(file_burst_offset(0, 1), Vec3::Y * render::BURST_RADIUS);
+    }
 }
