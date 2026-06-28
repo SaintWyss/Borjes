@@ -33,8 +33,8 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 | # | Phase | Status |
 |---|-------|--------|
 | 6 | Ventana Desktop → overlay on-demand | ✅ COMPLETA (spike→overlay toggle Meta+1; idle 0.6%) |
-| 7 | Archivos on-demand | pending (próxima) |
-| 8 | Pins + persistencia | pending |
+| 7 | Archivos on-demand | ✅ COMPLETA (click→burst cubos grises, native click-count, rescan teardown; 50 tests) |
+| 8 | Pins + persistencia | pending (próxima) |
 | 9 | Autostart + integración | pending |
 
 ## Notes
@@ -47,7 +47,7 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 8 — Pins + persistencia (next, not planned yet)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-27 — Milestone v2 started
+Status: Phase 7 complete; ready to plan phase 8
+Last activity: 2026-06-28 — Phase 7 done on acer (file-burst + Meta+1 signal-race fix)
