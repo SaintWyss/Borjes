@@ -10,13 +10,32 @@ pub struct NavState {
     pub dirty: bool,
 }
 
-// Hover-dive state: the pointer must MOVE to arm a dive, so resting on a node
-// settles you there instead of chain-diving (matches the neuron-flow mock).
-#[derive(Resource, Default)]
-pub struct HoverState {
-    pub last_cursor: Vec2,
-    pub armed: bool,
+// Hover-dwell state: hovering a node fills a 1s loading ring; only when it
+// completes do we dive. Leaving the node resets the timer.
+#[derive(Clone, Copy, PartialEq)]
+pub enum HoverTarget {
+    None,
+    Child(usize),
+    Parent,
 }
+
+#[derive(Resource)]
+pub struct HoverState {
+    pub target: HoverTarget,
+    pub elapsed: f32,
+}
+
+impl Default for HoverState {
+    fn default() -> Self {
+        HoverState {
+            target: HoverTarget::None,
+            elapsed: 0.0,
+        }
+    }
+}
+
+// Seconds of continuous hover before diving into a node.
+pub const DWELL_SECS: f32 = 0.5;
 
 #[derive(Component)]
 pub struct LevelNode;
@@ -158,10 +177,47 @@ pub fn render_level(
     nav.dirty = false;
 }
 
-// Neuron-flow navigation: a pointer MOVE arms a dive; the nearest node within
-// the hover radius is then entered (child = descend, parent ghost = ascend).
-// Resting on a node does nothing until you move again.
-pub fn dive_on_hover(
+const HOVER_RADIUS_PX: f32 = 70.0;
+
+// Which node (if any) is under the cursor right now.
+fn node_under_cursor(
+    cursor: Vec2,
+    camera: &Camera,
+    cam_tf: &GlobalTransform,
+    children: &Query<(&LevelChild, &GlobalTransform)>,
+    parents: &Query<&GlobalTransform, With<ParentNode>>,
+) -> HoverTarget {
+    let mut best_child: Option<(usize, f32)> = None;
+    for (child, gt) in children {
+        if let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) {
+            let d = screen.distance(cursor);
+            if d < HOVER_RADIUS_PX && best_child.is_none_or(|(_, bd)| d < bd) {
+                best_child = Some((child.0, d));
+            }
+        }
+    }
+
+    let mut parent_d = f32::INFINITY;
+    for gt in parents {
+        if let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) {
+            let d = screen.distance(cursor);
+            if d < HOVER_RADIUS_PX {
+                parent_d = parent_d.min(d);
+            }
+        }
+    }
+
+    match best_child {
+        Some((id, cd)) if cd <= parent_d => HoverTarget::Child(id),
+        _ if parent_d.is_finite() => HoverTarget::Parent,
+        _ => HoverTarget::None,
+    }
+}
+
+// Neuron-flow: hovering a node fills a 1s ring (DWELL_SECS); on completion we
+// dive (child = descend, parent ghost = ascend). Moving off the node resets it.
+pub fn hover_dwell(
+    time: Res<Time>,
     mut contexts: EguiContexts,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform)>,
@@ -174,62 +230,117 @@ pub fn dive_on_hover(
         return Ok(());
     };
     let Some(cursor) = window.cursor_position() else {
+        hover.target = HoverTarget::None;
         return Ok(());
     };
     if contexts.ctx_mut()?.is_pointer_over_egui() {
+        hover.target = HoverTarget::None;
         return Ok(());
     }
     let Ok((camera, cam_tf)) = cameras.single() else {
         return Ok(());
     };
 
-    // Movement (re)arms a dive; resting disarms via the dive itself.
-    if cursor.distance(hover.last_cursor) > 2.0 {
-        hover.armed = true;
-    }
-    hover.last_cursor = cursor;
-    if !hover.armed {
+    let target = node_under_cursor(cursor, camera, cam_tf, &children, &parents);
+
+    if target == HoverTarget::None || target != hover.target {
+        hover.target = target;
+        hover.elapsed = 0.0;
         return Ok(());
     }
 
-    const HOVER_RADIUS_PX: f32 = 70.0;
-
-    let mut best_child: Option<(usize, f32)> = None;
-    for (child, gt) in &children {
-        let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) else {
-            continue;
-        };
-        let d = screen.distance(cursor);
-        if d < HOVER_RADIUS_PX && best_child.is_none_or(|(_, bd)| d < bd) {
-            best_child = Some((child.0, d));
-        }
+    // Same target as last frame — accumulate dwell.
+    hover.elapsed += time.delta_secs();
+    if hover.elapsed < DWELL_SECS {
+        return Ok(());
     }
 
-    let mut parent_d = f32::MAX;
-    for gt in &parents {
-        if let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) {
-            let d = screen.distance(cursor);
-            if d < HOVER_RADIUS_PX {
-                parent_d = parent_d.min(d);
+    match hover.target {
+        HoverTarget::Child(id) => {
+            nav.current = id;
+            nav.dirty = true;
+        }
+        HoverTarget::Parent => {
+            if let Some(parent) = nav.tree.parent(nav.current) {
+                nav.current = parent;
+                nav.dirty = true;
             }
         }
+        HoverTarget::None => {}
     }
+    hover.target = HoverTarget::None;
+    hover.elapsed = 0.0;
 
-    if let Some((child_id, child_d)) = best_child {
-        if child_d <= parent_d {
-            nav.current = child_id;
-            nav.dirty = true;
-            hover.armed = false;
-            return Ok(());
-        }
+    Ok(())
+}
+
+// Draw the loading ring around the node being dwelled on.
+pub fn draw_hover_ring(
+    mut contexts: EguiContexts,
+    hover: Res<HoverState>,
+    cameras: Query<(&Camera, &GlobalTransform)>,
+    children: Query<(&LevelChild, &GlobalTransform)>,
+    parents: Query<&GlobalTransform, With<ParentNode>>,
+) -> Result {
+    if hover.target == HoverTarget::None {
+        return Ok(());
     }
-    if parent_d.is_finite() {
-        if let Some(parent) = nav.tree.parent(nav.current) {
-            nav.current = parent;
-            nav.dirty = true;
-            hover.armed = false;
-        }
+    let Ok((camera, cam_tf)) = cameras.single() else {
+        return Ok(());
+    };
+
+    // Resolve the dwelled node's world position.
+    let world = match hover.target {
+        HoverTarget::Child(id) => children
+            .iter()
+            .find(|(c, _)| c.0 == id)
+            .map(|(_, gt)| gt.translation()),
+        HoverTarget::Parent => parents.iter().next().map(|gt| gt.translation()),
+        HoverTarget::None => None,
+    };
+    let Some(world) = world else {
+        return Ok(());
+    };
+    let Ok(screen) = camera.world_to_viewport(cam_tf, world) else {
+        return Ok(());
+    };
+
+    let progress = (hover.elapsed / DWELL_SECS).clamp(0.0, 1.0);
+    let center = egui::pos2(screen.x, screen.y);
+    let radius = 34.0;
+
+    let ctx = contexts.ctx_mut()?;
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("ring"),
+    ));
+
+    // Faint full track.
+    painter.circle_stroke(
+        center,
+        radius,
+        egui::Stroke::new(
+            2.0,
+            egui::Color32::from_rgba_unmultiplied(120, 200, 220, 60),
+        ),
+    );
+
+    // Progress arc, clockwise from the top.
+    let segments = 64;
+    let filled = (segments as f32 * progress).ceil().max(1.0) as usize;
+    let mut points = Vec::with_capacity(filled + 1);
+    for i in 0..=filled {
+        let t = (i as f32 / segments as f32) * std::f32::consts::TAU;
+        let angle = -std::f32::consts::FRAC_PI_2 + t;
+        points.push(egui::pos2(
+            center.x + angle.cos() * radius,
+            center.y + angle.sin() * radius,
+        ));
     }
+    painter.add(egui::Shape::line(
+        points,
+        egui::Stroke::new(3.5, egui::Color32::from_rgb(110, 230, 245)),
+    ));
 
     Ok(())
 }

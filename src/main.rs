@@ -63,7 +63,9 @@ fn main() {
             PanOrbitCameraPlugin,
         ))
         .insert_resource(WinitSettings {
-            focused_mode: UpdateMode::reactive(Duration::from_secs(5)),
+            // Visible/focused → continuous so the dwell ring + glow animate even
+            // with the cursor held still. Hidden/unfocused → low power (idle cheap).
+            focused_mode: UpdateMode::Continuous,
             unfocused_mode: UpdateMode::reactive_low_power(Duration::from_secs(60)),
         })
         .insert_resource(render::GraphData(Vec::new()))
@@ -87,7 +89,11 @@ fn main() {
         )
         .add_systems(
             EguiPrimaryContextPass,
-            (drill::draw_breadcrumb, drill::draw_labels),
+            (
+                drill::draw_breadcrumb,
+                drill::draw_labels,
+                drill::draw_hover_ring,
+            ),
         )
         .add_systems(
             Update,
@@ -95,7 +101,7 @@ fn main() {
                 toggle_overlay_visibility,
                 handle_rescan,
                 drill::ascend,
-                drill::dive_on_hover,
+                drill::hover_dwell,
                 drill::render_level,
                 ui::animate_camera_to_target,
             )
