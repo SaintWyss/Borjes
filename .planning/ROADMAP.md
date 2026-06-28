@@ -108,6 +108,11 @@ Plans:
 2. Los archivos aparecen en burst local radial alrededor de su carpeta sin re-acomodar la galaxia
 3. Nodos-archivo visualmente distintos de carpetas
 4. Doble-click: carpeta→Dolphin, archivo→xdg-open (app default)
+**Plans:** 3 plans
+Plans:
+- [ ] 07-01-PLAN.md — File scan (scan_files) + shared gray cuboid assets + fibonacci burst geometry
+- [ ] 07-02-PLAN.md — FileNode/Expanded + Pointer<Click>.count routing + burst spawn/collapse + open + hover
+- [ ] 07-03-PLAN.md — handle_rescan file-node teardown + tactile GUI verification
 
 ### Phase 8: Pins + persistencia
 **Goal:** Pinear nodos por click-derecho, persistidos y siempre visibles.
