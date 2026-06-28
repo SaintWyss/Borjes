@@ -12,8 +12,10 @@ mod root;
 mod scan;
 mod ui;
 
-use bevy::camera::ScalingMode;
+use bevy::camera::Hdr;
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::picking::mesh_picking::MeshPickingPlugin;
+use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, poll_once, AsyncComputeTaskPool, Task};
 use bevy::window::{MonitorSelection, Window, WindowMode, WindowPlugin};
@@ -72,6 +74,8 @@ fn main() {
         .insert_resource(pins::PinStore(pins::load_pins()))
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
+        .insert_resource(drill::HoverState::default())
+        .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
         .add_systems(
             Startup,
             (
@@ -91,7 +95,7 @@ fn main() {
                 toggle_overlay_visibility,
                 handle_rescan,
                 drill::ascend,
-                drill::level_click,
+                drill::dive_on_hover,
                 drill::render_level,
                 ui::animate_camera_to_target,
             )
@@ -111,15 +115,13 @@ fn setup_camera(mut commands: Commands, mut materials: ResMut<Assets<StandardMat
     });
     commands.insert_resource(interaction::HighlightMaterial(highlight));
 
+    // Perspective camera with HDR + Bloom so the emissive nodes glow like neurons.
     commands.spawn((
         Camera3d::default(),
-        Projection::from(OrthographicProjection {
-            scaling_mode: ScalingMode::FixedVertical {
-                viewport_height: 90.0,
-            },
-            ..OrthographicProjection::default_3d()
-        }),
-        Transform::from_xyz(0.0, 0.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Hdr,
+        Tonemapping::TonyMcMapface,
+        Bloom::NATURAL,
+        Transform::from_xyz(0.0, 0.0, 60.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
     commands.spawn((
