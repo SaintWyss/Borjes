@@ -1,3 +1,7 @@
+// v2 search panel + pin menu live here; v3 drill-down unregisters them and they
+// are rewired in F13. Only animate_camera_to_target stays live for now.
+#![allow(dead_code)]
+
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use bevy_panorbit_camera::PanOrbitCamera;

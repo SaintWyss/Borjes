@@ -20,6 +20,7 @@ pub struct HighlightMaterial(pub Handle<StandardMaterial>);
 pub struct OriginalMaterial(pub Handle<StandardMaterial>);
 
 #[derive(Component)]
+#[allow(dead_code)] // v2 pin visual — rewired into drill-down in F13
 pub struct Pinned {
     pub original: Handle<StandardMaterial>,
 }
@@ -195,6 +196,7 @@ pub fn apply_pin_visual(
     ));
 }
 
+#[allow(dead_code)] // v2 pin visual — rewired in F13
 pub fn clear_pin_visual(commands: &mut Commands, entity: Entity, pinned: &Pinned) {
     commands.entity(entity).insert((
         MeshMaterial3d(pinned.original.clone()),

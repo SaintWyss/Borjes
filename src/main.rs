@@ -81,13 +81,17 @@ fn main() {
                 init_nav,
             ),
         )
-        .add_systems(EguiPrimaryContextPass, (ui::search_panel, ui::pin_menu))
+        .add_systems(
+            EguiPrimaryContextPass,
+            (drill::draw_breadcrumb, drill::draw_labels),
+        )
         .add_systems(
             Update,
             (
                 toggle_overlay_visibility,
                 handle_rescan,
                 drill::ascend,
+                drill::level_click,
                 drill::render_level,
                 ui::animate_camera_to_target,
             )
@@ -95,7 +99,6 @@ fn main() {
         )
         .add_observer(interaction::on_node_over)
         .add_observer(interaction::on_node_out)
-        .add_observer(drill::on_level_click)
         .run();
 }
 
