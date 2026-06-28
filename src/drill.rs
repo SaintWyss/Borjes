@@ -67,6 +67,16 @@ const HUB_RADIUS: f32 = 1.4;
 const CHILD_RADIUS: f32 = 0.9;
 const PARENT_RADIUS: f32 = 0.7;
 
+// Per-node grow-in + hover-bump animation.
+#[derive(Component)]
+pub struct NodeAnim {
+    pub base: f32,
+    pub age: f32,
+}
+
+const GROW_SECS: f32 = 0.28;
+const HOVER_BUMP: f32 = 1.28;
+
 fn glow_material(color: Color, intensity: f32) -> StandardMaterial {
     let mut emissive = color.to_linear();
     emissive.red *= intensity;
@@ -100,6 +110,8 @@ pub fn render_level(
     let hub_mat = materials.add(glow_material(Color::srgb(0.45, 0.95, 1.0), 6.0));
     let child_mat = materials.add(glow_material(Color::srgb(0.2, 0.72, 0.78), 3.0));
     let parent_mat = materials.add(glow_material(Color::srgb(0.5, 0.55, 0.62), 1.5));
+    let connector = meshes.add(Cylinder::new(0.05, 1.0));
+    let connector_mat = materials.add(glow_material(Color::srgb(0.18, 0.62, 0.7), 2.2));
 
     let current = nav.current;
     let child_ids = nav.tree.children(current).to_vec();
@@ -110,8 +122,12 @@ pub fn render_level(
         commands.spawn((
             Mesh3d(sphere.clone()),
             MeshMaterial3d(hub_mat),
-            Transform::from_translation(Vec3::ZERO).with_scale(Vec3::splat(HUB_RADIUS)),
+            Transform::from_translation(Vec3::ZERO).with_scale(Vec3::ZERO),
             LevelNode,
+            NodeAnim {
+                base: HUB_RADIUS,
+                age: 0.0,
+            },
             NodeLabel {
                 name: node.name.clone(),
                 count: child_ids.len(),
@@ -129,13 +145,32 @@ pub fn render_level(
             .unwrap_or_else(|| (format!("folder-{child_id}"), 0));
 
         let z = ((idx % 3) as f32 - 1.0) * 0.6;
+        let child_pos = Vec3::new(position.x, position.y, z);
+
+        // Glowing connector from the hub to this child.
+        let dir = child_pos;
+        let len = dir.length().max(0.001);
+        commands.spawn((
+            Mesh3d(connector.clone()),
+            MeshMaterial3d(connector_mat.clone()),
+            Transform {
+                translation: child_pos * 0.5,
+                rotation: Quat::from_rotation_arc(Vec3::Y, dir / len),
+                scale: Vec3::new(1.0, len, 1.0),
+            },
+            LevelNode,
+        ));
+
         commands.spawn((
             Mesh3d(sphere.clone()),
             MeshMaterial3d(child_mat.clone()),
-            Transform::from_translation(Vec3::new(position.x, position.y, z))
-                .with_scale(Vec3::splat(CHILD_RADIUS)),
+            Transform::from_translation(child_pos).with_scale(Vec3::ZERO),
             LevelNode,
             LevelChild(child_id),
+            NodeAnim {
+                base: CHILD_RADIUS,
+                age: 0.0,
+            },
             NodeLabel {
                 name: child_name,
                 count: grandchildren,
@@ -156,9 +191,13 @@ pub fn render_level(
             Mesh3d(sphere.clone()),
             MeshMaterial3d(parent_mat),
             Transform::from_translation(Vec3::new(0.0, ring_radius + 4.0, -1.0))
-                .with_scale(Vec3::splat(PARENT_RADIUS)),
+                .with_scale(Vec3::ZERO),
             LevelNode,
             ParentNode,
+            NodeAnim {
+                base: PARENT_RADIUS,
+                age: 0.0,
+            },
             NodeLabel {
                 name: format!("\u{2191} {parent_name}"),
                 count: 0,
@@ -353,6 +392,36 @@ pub fn ascend(keys: Res<ButtonInput<KeyCode>>, mut nav: ResMut<NavState>) {
     if let Some(parent) = nav.tree.parent(nav.current) {
         nav.current = parent;
         nav.dirty = true;
+    }
+}
+
+// Grow-in (scale 0→base, ease-out) + smooth hover bump, per node.
+pub fn animate_nodes(
+    time: Res<Time>,
+    hover: Res<HoverState>,
+    mut nodes: Query<(
+        &mut Transform,
+        &mut NodeAnim,
+        Option<&LevelChild>,
+        Option<&ParentNode>,
+    )>,
+) {
+    let dt = time.delta_secs();
+    for (mut tf, mut anim, child, parent) in &mut nodes {
+        anim.age += dt;
+        let g = (anim.age / GROW_SECS).clamp(0.0, 1.0);
+        let grow = 1.0 - (1.0 - g).powi(3); // ease-out cubic
+
+        let hovered = match hover.target {
+            HoverTarget::Child(id) => child.is_some_and(|c| c.0 == id),
+            HoverTarget::Parent => parent.is_some(),
+            HoverTarget::None => false,
+        };
+        let target = anim.base * grow * if hovered { HOVER_BUMP } else { 1.0 };
+
+        let current = tf.scale.x;
+        let next = current + (target - current) * (dt * 12.0).min(1.0);
+        tf.scale = Vec3::splat(next);
     }
 }
 

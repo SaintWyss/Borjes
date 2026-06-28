@@ -103,6 +103,7 @@ fn main() {
                 drill::ascend,
                 drill::hover_dwell,
                 drill::render_level,
+                drill::animate_nodes,
                 ui::animate_camera_to_target,
             )
                 .chain(),
