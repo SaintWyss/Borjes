@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Desktop mode
-status: planning
-last_updated: "2026-06-27T17:28:11.376Z"
-last_activity: 2026-06-27
+status: complete
+last_updated: "2026-06-28T22:00:00.000Z"
+last_activity: 2026-06-28
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 4
+  completed_phases: 4
+  total_plans: 7
+  completed_plans: 7
+  percent: 100
 ---
 
 # State — datatree-rs
@@ -35,7 +35,7 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 | 6 | Ventana Desktop → overlay on-demand | ✅ COMPLETA (spike→overlay toggle Meta+1; idle 0.6%) |
 | 7 | Archivos on-demand | ✅ COMPLETA (click→burst cubos grises, native click-count, rescan teardown; 50 tests) |
 | 8 | Pins + persistencia | ✅ COMPLETA (right-click→Pin/Unpin dorado, pins.json std-only, sobrevive rescan/restart; pan→botón medio) |
-| 9 | Autostart + integración | pending (próxima) |
+| 9 | Autostart + integración | ✅ COMPLETA (autostart KDE lanza overlay oculto al login; op 018 sync-control) |
 
 ## Notes
 - Cross-AI: Codex construye vía codex-gsd-exec, Claude verifica (cargo build/test/clippy) + commitea.
@@ -47,7 +47,7 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 
 ## Current Position
 
-Phase: 8 — Pins + persistencia (next, not planned yet)
+Phase: — (milestone v2 COMPLETE, 9/9 phases)
 Plan: —
-Status: Phase 7 complete; ready to plan phase 8
-Last activity: 2026-06-28 — Phase 7 done on acer (file-burst + Meta+1 signal-race fix)
+Status: Milestone v2 "Desktop mode" complete. Overlay on-demand + file-burst + pins + autostart all shipped on acer.
+Last activity: 2026-06-28 — Phase 9 done (autostart al login, op 018 sync-control)

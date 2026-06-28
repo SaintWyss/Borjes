@@ -55,6 +55,27 @@ pkill -USR1 -x datatree-rs
 
 Este bind es per-máquina, no sincroniza. Quedó registrado en `sync-control` op 016.
 
+## Autostart al login (Fase 9)
+
+El proceso arranca solo al iniciar sesión KDE (oculto), así Meta+1 lo muestra sin lanzarlo a mano. Entry en `~/.config/autostart/datatree-rs.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=datatree-rs overlay
+Exec=/home/saintwyss/dev/datatree-rs/target/release/datatree-rs
+X-KDE-autostart-after=panel
+NoDisplay=true
+```
+
+Arranca con `visible: false` (idle ~0.6%). Si se cierra, el wrapper `~/.local/bin/datatree-toggle` (el que dispara Meta+1) lo relanza. Per-máquina, no sincroniza. Registrado en `sync-control` op 018.
+
+Desactivar autostart: `rm ~/.config/autostart/datatree-rs.desktop`.
+
+## Right-click / pin (Fase 8)
+
+El pan de cámara está remapeado a **botón del medio** porque el botón derecho quedó reservado para el menú Pin/Unpin (default `button_pan` de PanOrbitCamera era Right y se comía el click). Orbit = izquierdo, pan = medio, zoom = rueda.
+
 ## Costo / rendimiento
 
 - Oculto: ~0.6% CPU, idle real, no interfiere con la sesión.
@@ -63,5 +84,5 @@ Este bind es per-máquina, no sincroniza. Quedó registrado en `sync-control` op
 
 ## Troubleshooting
 
-- `Meta+1` no hace nada: revisar si el proceso está corriendo con `pgrep -x datatree-rs`. El autostart al login es Fase 9; por ahora se lanza a mano.
+- `Meta+1` no hace nada: revisar si el proceso está corriendo con `pgrep -x datatree-rs`. Desde Fase 9 arranca solo al login; si no, el wrapper `~/.local/bin/datatree-toggle` lo relanza en el próximo Meta+1.
 - Ruido en el log: `Couldn't get swap chain texture: Outdated` mientras está oculto es inofensivo. `Reactive` despierta periódicamente, pero no afecta el ~0.6%.
