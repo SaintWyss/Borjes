@@ -10,6 +10,17 @@ pub struct NavState {
     pub dirty: bool,
 }
 
+#[derive(Resource)]
+pub struct CamTarget {
+    pub distance: f32,
+}
+
+impl Default for CamTarget {
+    fn default() -> Self {
+        Self { distance: 60.0 }
+    }
+}
+
 // Hover-dwell state: hovering a node fills a 1s loading ring; only when it
 // completes do we dive. Leaving the node resets the timer.
 #[derive(Clone, Copy, PartialEq)]
@@ -93,8 +104,8 @@ fn glow_material(color: Color, intensity: f32) -> StandardMaterial {
 pub fn render_level(
     mut commands: Commands,
     mut nav: ResMut<NavState>,
+    mut cam_target: ResMut<CamTarget>,
     existing: Query<Entity, With<LevelNode>>,
-    mut cameras: Query<&mut Transform, With<Camera3d>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -209,11 +220,26 @@ pub fn render_level(
     // Pull the perspective camera back so the whole ring frames nicely.
     let ring_radius = nav::RADIAL_BASE + nav::RADIAL_PER_CHILD * child_ids.len() as f32;
     let distance = (ring_radius + 6.0) * 2.2;
-    if let Ok(mut cam) = cameras.single_mut() {
-        *cam = Transform::from_xyz(0.0, 0.0, distance).looking_at(Vec3::ZERO, Vec3::Y);
-    }
+    cam_target.distance = distance;
 
     nav.dirty = false;
+}
+
+pub fn animate_camera(
+    time: Res<Time>,
+    target: Res<CamTarget>,
+    mut cam: Query<&mut Transform, With<Camera3d>>,
+) {
+    let Ok(mut cam) = cam.single_mut() else {
+        return;
+    };
+
+    const SPEED: f32 = 6.0;
+
+    let dt = time.delta_secs();
+    let z = cam.translation.z;
+    let eased_z = z + (target.distance - z) * (1.0 - (-dt * SPEED).exp());
+    *cam = Transform::from_xyz(0.0, 0.0, eased_z).looking_at(Vec3::ZERO, Vec3::Y);
 }
 
 const HOVER_RADIUS_PX: f32 = 70.0;

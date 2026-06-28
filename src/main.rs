@@ -77,6 +77,7 @@ fn main() {
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
         .insert_resource(drill::HoverState::default())
+        .insert_resource(drill::CamTarget { distance: 60.0 })
         .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
         .add_systems(
             Startup,
@@ -103,6 +104,7 @@ fn main() {
                 drill::ascend,
                 drill::hover_dwell,
                 drill::render_level,
+                drill::animate_camera,
                 drill::animate_nodes,
                 ui::animate_camera_to_target,
             )
