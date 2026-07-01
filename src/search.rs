@@ -10,7 +10,7 @@ use crate::root::{expand_tilde, RootConfig};
 use crate::ui::normalize;
 
 #[derive(Resource, Default)]
-pub struct NeuraSearch {
+pub struct BorjesSearch {
     pub query: String,
     pub selected: usize,
     pub results: Vec<usize>,
@@ -86,7 +86,7 @@ pub fn short_path(path: &Path, root: &Path) -> String {
 pub fn search_ui(
     mut contexts: EguiContexts,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
-    mut search: ResMut<NeuraSearch>,
+    mut search: ResMut<BorjesSearch>,
     mut nav: ResMut<NavState>,
     root: Res<RootConfig>,
 ) -> Result {
@@ -111,7 +111,7 @@ pub fn search_ui(
     let mut changed = false;
     let mut chosen = None;
 
-    egui::Area::new(egui::Id::new("neura_search"))
+    egui::Area::new(egui::Id::new("borjes_search"))
         .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0))
         .show(ctx, |ui| {
             egui::Frame::new()

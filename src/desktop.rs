@@ -23,7 +23,7 @@ pub fn install_signal_handler() {
 pub fn toggle_overlay_visibility(
     mut windows: Query<(Entity, &mut Window), With<PrimaryWindow>>,
     keys: Res<ButtonInput<KeyCode>>,
-    search: Res<crate::search::NeuraSearch>,
+    search: Res<crate::search::BorjesSearch>,
     mut focus_frames: Local<u8>,
     _main_thread: NonSendMarker,
 ) {

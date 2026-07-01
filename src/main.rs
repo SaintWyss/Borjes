@@ -90,7 +90,7 @@ fn main() {
         .insert_resource(icons::load_icon_config())
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
-        .insert_resource(search::NeuraSearch::default())
+        .insert_resource(search::BorjesSearch::default())
         .insert_resource(drill::HoverState::default())
         .insert_resource(drill::IconMenu::default())
         .insert_resource(drill::CamTarget { distance: 60.0 })

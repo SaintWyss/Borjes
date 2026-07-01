@@ -2,7 +2,7 @@
 
 `Borjes` es una aplicacion de escritorio nativa escrita en Rust que visualiza un arbol de carpetas como una interfaz 3D navegable. Su objetivo principal es permitir encontrar y abrir carpetas profundas de `~/Data` rapidamente, sin tener que recorrer manualmente niveles de directorios en el explorador de archivos.
 
-El concepto de producto es **NEURA**: un overlay visual tipo mapa neuronal/galaxia para navegar informacion local. La version actual ya funciona como overlay fullscreen on-demand y muestra un nivel del arbol por vez: la carpeta actual aparece como nodo central y sus subcarpetas alrededor.
+El concepto de producto es **Borjes**: un overlay visual tipo mapa neuronal/galaxia para navegar informacion local. La version actual ya funciona como overlay fullscreen on-demand y muestra un nivel del arbol por vez: la carpeta actual aparece como nodo central y sus subcarpetas alrededor.
 
 ## Para que sirve
 
@@ -45,7 +45,7 @@ Hay modulos heredados o parcialmente preparados para etapas anteriores/siguiente
 
 - `layout.rs`: layout global force-directed para renderizar todo el grafo a la vez.
 - `render.rs`: infraestructura para nodos globales, colores por cluster y file bursts.
-- `ui.rs`: buscador, resaltado y panel de reescaneo, actualmente no conectado al loop principal de NEURA.
+- `ui.rs`: buscador, resaltado y panel de reescaneo, actualmente no conectado al loop principal de Borjes.
 - `pins.rs`: persistencia de carpetas pineadas en JSON, tambien preparada para integracion futura.
 
 ## Tecnologias
@@ -68,7 +68,7 @@ src/
   desktop.rs      # overlay on-demand: SIGUSR1, visibilidad y Escape
   scan.rs         # escaneo de carpetas y archivos
   nav.rs          # arbol en memoria y layout radial por nivel
-  drill.rs        # experiencia NEURA actual: hub, hijos, hover-dwell, labels
+  drill.rs        # experiencia Borjes actual: hub, hijos, hover-dwell, labels
   render.rs       # render de grafo global y assets reutilizables
   interaction.rs  # clicks, hover, apertura de archivos/carpetas y pin visual
   ui.rs           # buscador/panel/pin menu heredados
@@ -217,5 +217,5 @@ El segundo enfoque reduce ruido visual y evita mostrar miles de nodos a la vez. 
 - Reconectar buscador como teletransporte a carpetas profundas.
 - Integrar pins como accesos rapidos navegables.
 - Permitir configurar la raiz desde UI activa o argumento CLI.
-- Unificar o retirar codigo heredado del grafo global cuando NEURA este completo.
+- Unificar o retirar codigo heredado del grafo global cuando Borjes este completo.
 - Agregar instrucciones por distribucion para dependencias nativas de Bevy.

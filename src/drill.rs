@@ -796,7 +796,7 @@ pub fn draw_hover_ring(
 pub fn ascend(
     keys: Res<ButtonInput<KeyCode>>,
     mut nav: ResMut<NavState>,
-    mut search: ResMut<crate::search::NeuraSearch>,
+    mut search: ResMut<crate::search::BorjesSearch>,
 ) {
     let requested = keys.just_pressed(KeyCode::Backspace) || search.ascend_requested;
     search.ascend_requested = false;
@@ -907,7 +907,7 @@ pub fn draw_labels(
     Ok(())
 }
 
-// Breadcrumb top bar: NEURA · root / … / current.
+// Breadcrumb top bar: BORJES · root / … / current.
 #[allow(deprecated)] // egui marks Panel::show deprecated but show(ctx) is correct (matches ui.rs)
 pub fn draw_breadcrumb(mut contexts: EguiContexts, nav: Res<NavState>) -> Result {
     let mut chain: Vec<String> = Vec::new();
@@ -925,7 +925,7 @@ pub fn draw_breadcrumb(mut contexts: EguiContexts, nav: Res<NavState>) -> Result
     egui::TopBottomPanel::top("breadcrumb").show(ctx, |ui| {
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new("NEURA")
+                egui::RichText::new("BORJES")
                     .strong()
                     .color(egui::Color32::from_rgb(90, 220, 235)),
             );
