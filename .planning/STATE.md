@@ -53,9 +53,19 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 - Spec v2: docs/superpowers/specs/2026-06-27-desktop-mode-design.md
 - Riesgo F6: convivencia ventana Desktop X11 con wallpaper Plasma (research acotada en plan-phase 6).
 
+## v4 — Búsqueda primero (plan ~/.claude/plans/quiero-continuar-con-mi-partitioned-curry.md)
+| # | Phase | Status |
+|---|-------|--------|
+| 13 | Buscador live (Meta+1→tipear→Enter abre) | ✅ d1cee0a1 |
+| 14 | Tab teleport + focus-request winit | ✅ 61441a1f |
+| 15 | Pins: chips dorados + Alt+1-9 + menú Pin/Unpin | ✅ 100e471a |
+| 16 | Frecencia (half-life 14d) + Enter-vacío abre hub | ✅ 100e471a |
+
+App renombrada **Borjes** (NEURA = nombre viejo, 72cde055). Regla KWin `[borjes-focus]` op 020 (foco al re-mostrar; Santiago-PC pendiente).
+
 ## Current Position
 
-Phase: — (milestone v2 COMPLETE, 9/9 phases)
+Phase: — (milestone v4 code COMPLETE, 4/4)
 Plan: —
-Status: Milestone v2 "Desktop mode" complete. Overlay on-demand + file-burst + pins + autostart all shipped on acer.
-Last activity: 2026-06-28 — Phase 9 done (autostart al login, op 018 sync-control)
+Status: v4 "Búsqueda primero" implementado; 98 tests. PENDIENTE: smoke test del usuario (Meta+1→tipear→Enter, Tab, Alt+N, pins) + verificar foco KWin en sesión real.
+Last activity: 2026-07-01 — F13-F16 + rename Borjes + regla KWin (saint-acer)
