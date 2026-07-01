@@ -49,18 +49,15 @@ mod tests {
 
     #[test]
     fn expand_tilde_leaves_absolute_paths_unchanged() {
-        let path = PathBuf::from("/tmp/datatree-rs");
+        let path = PathBuf::from("/tmp/borjes");
 
         assert_eq!(expand_tilde(path.to_str().unwrap()), path);
     }
 
     #[test]
     fn scan_folder_missing_path_returns_empty_without_panic() {
-        let missing = std::env::temp_dir().join(format!(
-            "datatree-rs-missing-{}-{}",
-            std::process::id(),
-            "root"
-        ));
+        let missing =
+            std::env::temp_dir().join(format!("borjes-missing-{}-{}", std::process::id(), "root"));
 
         assert!(!missing.exists());
         assert!(scan_folder(&missing).is_empty());

@@ -1,4 +1,4 @@
-# datatree-rs v2 — "Desktop mode" — Design
+# Borjes v2 — "Desktop mode" — Design
 
 **Fecha:** 2026-06-27
 **Estado:** Aprobado por el usuario, listo para roadmap (GSD milestone v2)
@@ -6,7 +6,7 @@
 
 ## Visión
 
-Convertir datatree-rs de un explorador de archivos 3D en **la capa de escritorio** del usuario: el grafo vive de fondo (debajo de las ventanas) y se revela con **Mostrar escritorio (Meta+D)**. Reusa todo lo de v1.
+Convertir Borjes de un explorador de archivos 3D en **la capa de escritorio** del usuario: el grafo vive de fondo (debajo de las ventanas) y se revela con **Mostrar escritorio (Meta+D)**. Reusa todo lo de v1.
 
 ## Core Value
 
@@ -22,7 +22,7 @@ El escritorio deja de ser un wallpaper estático: pasa a ser el mapa navegable d
 | D4 | Archivos on-demand | **Click** en carpeta = toggle: aparecen/desaparecen sus archivos como nodos hoja (scan lazy de ese dir, un nivel). |
 | D5 | Interacción | **Click = expandir** (toggle archivos de esa carpeta). **Doble-click = abrir** (carpeta→Dolphin, archivo→`xdg-open` app default). |
 | D6 | Archivo nodo | Más chico, forma/color distinto (ej gris/diamante) para diferenciar de carpeta. |
-| D7 | Pins | **Click-derecho → "Pin"** (menú egui). Pin siempre visible (sobrevive colapso/reescaneo), marca propia (borde dorado). Persistido en `~/.config/datatree-rs/pins.json`. |
+| D7 | Pins | **Click-derecho → "Pin"** (menú egui). Pin siempre visible (sobrevive colapso/reescaneo), marca propia (borde dorado). Persistido en `~/.config/borjes/pins.json`. |
 | D8 | Expandir NO re-acomoda la galaxia | Archivos aparecen en **burst local radial** alrededor de su carpeta; el resto del grafo queda fijo. Colapsar los saca. |
 | D9 | Perf | On-demand mantiene el conteo bajo → no se necesita Barnes-Hut todavía. |
 | D10 | Autostart | App al login (autostart KDE, per-máquina). Registrar en sync-control. Pedir OK al activar. |

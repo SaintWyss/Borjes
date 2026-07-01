@@ -3,6 +3,7 @@
 
 mod desktop;
 mod drill;
+mod icons;
 mod interaction;
 mod layout;
 mod nav;
@@ -48,16 +49,27 @@ fn main() {
 
     App::new()
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    decorations: false,
-                    mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
-                    visible: false,
-                    window_level: bevy::window::WindowLevel::AlwaysOnTop,
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        decorations: false,
+                        mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+                        visible: false,
+                        window_level: bevy::window::WindowLevel::AlwaysOnTop,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                // Absolute asset root so icons load no matter the cwd (autostart
+                // launches the binary from $HOME, not the repo).
+                .set(bevy::asset::AssetPlugin {
+                    file_path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("assets")
+                        .display()
+                        .to_string(),
+                    unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                     ..default()
                 }),
-                ..default()
-            }),
             MeshPickingPlugin,
             EguiPlugin::default(),
             PanOrbitCameraPlugin,
@@ -74,9 +86,11 @@ fn main() {
         .insert_resource(interaction::Selected(None))
         .insert_resource(interaction::PinMenu::default())
         .insert_resource(pins::PinStore(pins::load_pins()))
+        .insert_resource(icons::load_icon_config())
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
         .insert_resource(drill::HoverState::default())
+        .insert_resource(drill::IconMenu::default())
         .insert_resource(drill::CamTarget { distance: 60.0 })
         .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
         .add_systems(
@@ -85,6 +99,7 @@ fn main() {
                 setup_camera,
                 render::setup_file_assets,
                 render::setup_pin_assets,
+                icons::load_icon_assets,
                 init_nav,
             ),
         )
@@ -92,6 +107,7 @@ fn main() {
             EguiPrimaryContextPass,
             (
                 drill::draw_breadcrumb,
+                drill::draw_icon_menu,
                 drill::draw_labels,
                 drill::draw_hover_ring,
             ),
@@ -101,11 +117,14 @@ fn main() {
             (
                 toggle_overlay_visibility,
                 handle_rescan,
+                drill::open_icon_menu,
                 drill::ascend,
-                drill::hover_dwell,
+                drill::hover_track,
+                drill::click_dive,
                 drill::render_level,
                 drill::animate_camera,
                 drill::animate_nodes,
+                drill::animate_connectors,
                 ui::animate_camera_to_target,
             )
                 .chain(),

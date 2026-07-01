@@ -212,10 +212,8 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system clock before UNIX_EPOCH")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "datatree-rs-{name}-{}-{unique}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("borjes-{name}-{}-{unique}", std::process::id()));
 
         fs::create_dir(&path).expect("failed to create temp scan dir");
         path
@@ -270,7 +268,7 @@ mod tests {
 
     #[test]
     fn scan_files_returns_empty_for_missing_dir() {
-        let dir = std::env::temp_dir().join(format!("datatree-rs-missing-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("borjes-missing-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
 
         assert!(scan_files(&dir).is_empty());

@@ -24,13 +24,13 @@ pub fn save_pins(pins: &HashSet<PathBuf>) {
 pub fn pins_path() -> Option<PathBuf> {
     if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
         if !config_home.is_empty() {
-            return Some(PathBuf::from(config_home).join("datatree-rs/pins.json"));
+            return Some(PathBuf::from(config_home).join("borjes/pins.json"));
         }
     }
 
     std::env::var_os("HOME")
         .map(PathBuf::from)
-        .map(|home| home.join(".config/datatree-rs/pins.json"))
+        .map(|home| home.join(".config/borjes/pins.json"))
 }
 
 pub fn load_pins() -> HashSet<PathBuf> {
@@ -176,7 +176,7 @@ mod tests {
             .as_nanos();
 
         std::env::temp_dir().join(format!(
-            "datatree-rs-pins-{name}-{}-{unique}.json",
+            "borjes-pins-{name}-{}-{unique}.json",
             std::process::id()
         ))
     }

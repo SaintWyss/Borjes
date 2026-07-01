@@ -1,4 +1,4 @@
-# datatree-rs v3 "NEURA" — design spec
+# Borjes v3 "NEURA" — design spec
 
 **Estado:** decidido (Junta CEO cross-AI Codex+Gemini, 2026-06-28). No empezado.
 **Base de diseño:** mock `~/Descargas/Explorador de archivos 3D neuronal.zip` (canvas 2D — sirve como look+UX, no como motor).
@@ -30,7 +30,7 @@ Sigue Rust + Bevy 0.19. NO se cambia (web rechazado). Cámara orto en vez de Pan
 - `scan.rs` — `scan_folder` (árbol completo, se carga una vez) + `scan_files` (archivos por carpeta).
 - `desktop.rs` — overlay on-demand, Meta+1, SIGUSR1, idle reactive. Sin cambios.
 - `pins.rs` — PinStore + pins.json. Se agrega salto-al-pin.
-- autostart + `~/.local/bin/datatree-toggle`. Sin cambios.
+- autostart + `~/.local/bin/borjes-toggle`. Sin cambios.
 
 ### MUERE
 - `layout.rs` Fruchterman-Reingold async global. v3 no posiciona 4607 nodos juntos.

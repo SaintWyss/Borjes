@@ -1946,6 +1946,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "borjes"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "bevy_panorbit_camera",
+ "ignore",
+ "libc",
+ "open",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "bstr"
 version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2399,20 +2415,6 @@ name = "data-encoding"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
-
-[[package]]
-name = "datatree-rs"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "bevy_panorbit_camera",
- "ignore",
- "libc",
- "open",
- "rand 0.8.6",
- "unicode-normalization",
-]
 
 [[package]]
 name = "derive_more"

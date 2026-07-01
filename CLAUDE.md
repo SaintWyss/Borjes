@@ -1,7 +1,7 @@
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**datatree-rs**
+**Borjes**
 
 App de escritorio **nativa** (Rust + Bevy) que muestra el árbol de carpetas de `~/Data` como un **grafo 3D navegable tipo galaxia**, para llegar a cualquier carpeta sin recorrerla una por una en el explorador.
 
