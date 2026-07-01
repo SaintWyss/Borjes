@@ -87,7 +87,7 @@ pub fn search_ui(
     mut contexts: EguiContexts,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut search: ResMut<NeuraSearch>,
-    nav: ResMut<NavState>,
+    mut nav: ResMut<NavState>,
     root: Res<RootConfig>,
 ) -> Result {
     let Ok(mut window) = windows.single_mut() else {
@@ -188,6 +188,7 @@ pub fn search_ui(
     }
 
     let result_count = search.results.len();
+    let mut teleport = None;
     ctx.input(|input| {
         if input.key_pressed(egui::Key::ArrowDown) && result_count > 0 {
             search.selected = (search.selected + 1).min(result_count - 1);
@@ -197,6 +198,10 @@ pub fn search_ui(
         }
         if input.key_pressed(egui::Key::Enter) {
             chosen = search.results.get(search.selected).copied();
+        }
+        // Tab = teletransporte: navegar el grafo hasta el resultado sin abrirlo.
+        if input.key_pressed(egui::Key::Tab) {
+            teleport = search.results.get(search.selected).copied();
         }
         // `!changed`: si este mismo Backspace borró el último char, la query quedó
         // vacía recién ahora — no es un pedido de subir al padre.
@@ -209,6 +214,18 @@ pub fn search_ui(
             search.selected = 0;
         }
     });
+
+    if let Some(id) = teleport {
+        if nav.tree.node(id).is_some() {
+            nav.current = id;
+            nav.dirty = true;
+            search.query.clear();
+            search.results.clear();
+            search.selected = 0;
+            // Mantener el foco en el buscador para seguir tipeando desde el nuevo nivel.
+            search.focus_requested = true;
+        }
+    }
 
     if let Some(path) = chosen.and_then(|id| nav.tree.node(id).map(|node| node.path.clone())) {
         std::thread::spawn(move || {

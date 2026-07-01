@@ -1,5 +1,7 @@
+use bevy::ecs::system::NonSendMarker;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy::winit::WINIT_WINDOWS;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static TOGGLE_REQUESTED: AtomicBool = AtomicBool::new(false);
@@ -19,11 +21,13 @@ pub fn install_signal_handler() {
 }
 
 pub fn toggle_overlay_visibility(
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut windows: Query<(Entity, &mut Window), With<PrimaryWindow>>,
     keys: Res<ButtonInput<KeyCode>>,
     search: Res<crate::search::NeuraSearch>,
+    mut focus_frames: Local<u8>,
+    _main_thread: NonSendMarker,
 ) {
-    let Ok(mut window) = windows.single_mut() else {
+    let Ok((entity, mut window)) = windows.single_mut() else {
         return;
     };
 
@@ -31,7 +35,21 @@ pub fn toggle_overlay_visibility(
         window.visible = !window.visible;
         if window.visible {
             window.focused = true;
+            *focus_frames = 10;
         }
+    }
+
+    // KWin no da foco de teclado al re-mapear una ventana ya existente (focus
+    // stealing prevention): el primer show tras el launch enfoca, los siguientes
+    // no. Pedir el foco a winit durante unos frames post-show (cuando la ventana
+    // ya está mapeada) para que Meta+1 → tipear funcione siempre.
+    if *focus_frames > 0 && window.visible {
+        *focus_frames -= 1;
+        WINIT_WINDOWS.with_borrow(|winit_windows| {
+            if let Some(winit_window) = winit_windows.get_window(entity) {
+                winit_window.focus_window();
+            }
+        });
     }
 
     if window.visible && keys.just_pressed(KeyCode::Escape) && search.query.is_empty() {
