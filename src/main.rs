@@ -11,6 +11,7 @@ mod pins;
 mod render;
 mod root;
 mod scan;
+mod search;
 mod ui;
 
 use bevy::camera::Hdr;
@@ -89,6 +90,7 @@ fn main() {
         .insert_resource(icons::load_icon_config())
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
+        .insert_resource(search::NeuraSearch::default())
         .insert_resource(drill::HoverState::default())
         .insert_resource(drill::IconMenu::default())
         .insert_resource(drill::CamTarget { distance: 60.0 })
@@ -106,6 +108,7 @@ fn main() {
         .add_systems(
             EguiPrimaryContextPass,
             (
+                search::search_ui,
                 drill::draw_breadcrumb,
                 drill::draw_icon_menu,
                 drill::draw_labels,

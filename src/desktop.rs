@@ -21,6 +21,7 @@ pub fn install_signal_handler() {
 pub fn toggle_overlay_visibility(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     keys: Res<ButtonInput<KeyCode>>,
+    search: Res<crate::search::NeuraSearch>,
 ) {
     let Ok(mut window) = windows.single_mut() else {
         return;
@@ -33,7 +34,7 @@ pub fn toggle_overlay_visibility(
         }
     }
 
-    if window.visible && keys.just_pressed(KeyCode::Escape) {
+    if window.visible && keys.just_pressed(KeyCode::Escape) && search.query.is_empty() {
         window.visible = false;
     }
 }

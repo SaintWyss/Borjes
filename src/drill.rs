@@ -793,8 +793,15 @@ pub fn draw_hover_ring(
 }
 
 // Backspace ascends too (fallback to the hover-up gesture).
-pub fn ascend(keys: Res<ButtonInput<KeyCode>>, mut nav: ResMut<NavState>) {
-    if !keys.just_pressed(KeyCode::Backspace) {
+pub fn ascend(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut nav: ResMut<NavState>,
+    mut search: ResMut<crate::search::NeuraSearch>,
+) {
+    let requested = keys.just_pressed(KeyCode::Backspace) || search.ascend_requested;
+    search.ascend_requested = false;
+
+    if !requested {
         return;
     }
     if let Some(parent) = nav.tree.parent(nav.current) {

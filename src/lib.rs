@@ -12,4 +12,5 @@ pub mod pins;
 pub mod render;
 pub mod root;
 pub mod scan;
+pub mod search;
 pub mod ui;
