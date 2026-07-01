@@ -1,11 +1,16 @@
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts};
 
 use crate::drill::NavState;
+use crate::frecency::{self, Frecency, FrecencyEntry};
 use crate::nav::FolderTree;
+use crate::pins::PinStore;
 use crate::root::{expand_tilde, RootConfig};
 use crate::ui::normalize;
 
@@ -42,15 +47,26 @@ pub fn score(name: &str, query: &str) -> u32 {
     0
 }
 
-pub fn rank(tree: &FolderTree, query: &str, cap: usize) -> Vec<usize> {
-    let mut scored: Vec<(usize, u32, usize, usize, String)> = (0..tree.len())
+pub fn rank(
+    tree: &FolderTree,
+    query: &str,
+    cap: usize,
+    frec: &HashMap<PathBuf, FrecencyEntry>,
+    now: u64,
+) -> Vec<usize> {
+    let mut scored: Vec<(usize, u32, f64, usize, usize, String)> = (0..tree.len())
         .filter_map(|id| {
             let node = tree.node(id)?;
             let node_score = score(&node.name, query);
             (node_score > 0).then(|| {
+                let frecency_score = frec
+                    .get(&node.path)
+                    .map(|entry| frecency::decayed(entry, now))
+                    .unwrap_or(0.0);
                 (
                     id,
                     node_score,
+                    frecency_score,
                     node.depth,
                     node.name.len(),
                     node.name.clone(),
@@ -61,12 +77,13 @@ pub fn rank(tree: &FolderTree, query: &str, cap: usize) -> Vec<usize> {
 
     scored.sort_by(|a, b| {
         b.1.cmp(&a.1)
-            .then_with(|| a.2.cmp(&b.2))
+            .then_with(|| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal))
             .then_with(|| a.3.cmp(&b.3))
             .then_with(|| a.4.cmp(&b.4))
+            .then_with(|| a.5.cmp(&b.5))
     });
     scored.truncate(cap);
-    scored.into_iter().map(|(id, _, _, _, _)| id).collect()
+    scored.into_iter().map(|(id, _, _, _, _, _)| id).collect()
 }
 
 pub fn short_path(path: &Path, root: &Path) -> String {
@@ -88,6 +105,7 @@ pub fn search_ui(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut search: ResMut<BorjesSearch>,
     mut nav: ResMut<NavState>,
+    mut frecency: ResMut<Frecency>,
     root: Res<RootConfig>,
 ) -> Result {
     let Ok(mut window) = windows.single_mut() else {
@@ -110,6 +128,7 @@ pub fn search_ui(
     let ctx = contexts.ctx_mut()?;
     let mut changed = false;
     let mut chosen = None;
+    let mut open_current = false;
 
     egui::Area::new(egui::Id::new("borjes_search"))
         .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0))
@@ -183,7 +202,13 @@ pub fn search_ui(
         });
 
     if changed {
-        search.results = rank(&nav.tree, &search.query, 8);
+        search.results = rank(
+            &nav.tree,
+            &search.query,
+            8,
+            &frecency.0,
+            frecency::now_secs(),
+        );
         search.selected = 0;
     }
 
@@ -197,7 +222,11 @@ pub fn search_ui(
             search.selected = search.selected.saturating_sub(1);
         }
         if input.key_pressed(egui::Key::Enter) {
-            chosen = search.results.get(search.selected).copied();
+            if search.query.is_empty() {
+                open_current = true;
+            } else {
+                chosen = search.results.get(search.selected).copied();
+            }
         }
         // Tab = teletransporte: navegar el grafo hasta el resultado sin abrirlo.
         if input.key_pressed(egui::Key::Tab) {
@@ -228,6 +257,8 @@ pub fn search_ui(
     }
 
     if let Some(path) = chosen.and_then(|id| nav.tree.node(id).map(|node| node.path.clone())) {
+        frecency::bump(&mut frecency.0, &path, frecency::now_secs());
+        frecency::save_frecency(&frecency.0);
         std::thread::spawn(move || {
             let _ = open::that(path);
         });
@@ -237,8 +268,122 @@ pub fn search_ui(
         search.selected = 0;
     }
 
+    if open_current {
+        if let Some(path) = nav.tree.node(nav.current).map(|node| node.path.clone()) {
+            frecency::bump(&mut frecency.0, &path, frecency::now_secs());
+            frecency::save_frecency(&frecency.0);
+            std::thread::spawn(move || {
+                let _ = open::that(path);
+            });
+            window.visible = false;
+            search.query.clear();
+            search.results.clear();
+            search.selected = 0;
+        }
+    }
+
     search.prev_visible = true;
     Ok(())
+}
+
+pub fn pin_chips(
+    mut contexts: EguiContexts,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    pin_store: Res<PinStore>,
+    mut nav: ResMut<NavState>,
+    mut search: ResMut<BorjesSearch>,
+) -> Result {
+    let Ok(window) = windows.single() else {
+        return Ok(());
+    };
+    if !window.visible {
+        return Ok(());
+    }
+
+    let mut pins: Vec<PathBuf> = pin_store.0.iter().cloned().collect();
+    pins.sort_by(|a, b| {
+        file_label(a)
+            .to_lowercase()
+            .cmp(&file_label(b).to_lowercase())
+            .then_with(|| a.cmp(b))
+    });
+    pins.truncate(9);
+
+    if pins.is_empty() {
+        return Ok(());
+    }
+
+    let ctx = contexts.ctx_mut()?;
+    let mut teleport = None;
+
+    ctx.input(|input| {
+        if input.modifiers.alt {
+            for (idx, path) in pins.iter().enumerate() {
+                if alt_number_pressed(input, idx) {
+                    teleport = Some(path.clone());
+                    break;
+                }
+            }
+        }
+    });
+
+    egui::Area::new(egui::Id::new("pin_chips"))
+        .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -40.0))
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                for (idx, path) in pins.iter().enumerate() {
+                    let label = format!("{} · {}", idx + 1, file_label(path));
+                    let button = egui::Button::new(
+                        egui::RichText::new(label).color(egui::Color32::from_rgb(255, 214, 90)),
+                    )
+                    .fill(egui::Color32::from_rgba_premultiplied(4, 18, 24, 220))
+                    .stroke(egui::Stroke::new(
+                        1.0,
+                        egui::Color32::from_rgb(255, 214, 90),
+                    ))
+                    .corner_radius(egui::CornerRadius::same(8));
+
+                    if ui.add(button).clicked() {
+                        teleport = Some(path.clone());
+                    }
+                }
+            });
+        });
+
+    if let Some(path) = teleport {
+        if let Some(id) = nav.tree.find_by_path(&path) {
+            nav.current = id;
+            nav.dirty = true;
+            search.query.clear();
+            search.results.clear();
+            search.selected = 0;
+            search.focus_requested = true;
+        }
+    }
+
+    Ok(())
+}
+
+fn file_label(path: &Path) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+        .unwrap_or_else(|| path.display().to_string())
+}
+
+fn alt_number_pressed(input: &egui::InputState, idx: usize) -> bool {
+    match idx {
+        0 => input.key_pressed(egui::Key::Num1),
+        1 => input.key_pressed(egui::Key::Num2),
+        2 => input.key_pressed(egui::Key::Num3),
+        3 => input.key_pressed(egui::Key::Num4),
+        4 => input.key_pressed(egui::Key::Num5),
+        5 => input.key_pressed(egui::Key::Num6),
+        6 => input.key_pressed(egui::Key::Num7),
+        7 => input.key_pressed(egui::Key::Num8),
+        8 => input.key_pressed(egui::Key::Num9),
+        _ => false,
+    }
 }
 
 #[cfg(test)]

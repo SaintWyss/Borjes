@@ -4,6 +4,7 @@
 
 pub mod desktop;
 pub mod drill;
+pub mod frecency;
 pub mod icons;
 pub mod interaction;
 pub mod layout;

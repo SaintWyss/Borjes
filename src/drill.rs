@@ -4,6 +4,7 @@ use bevy_egui::{egui, EguiContexts};
 
 use crate::icons::{self, IconConfig, VisualKind, VisualSpec, ICON_IDS};
 use crate::nav::{self, radial_layout};
+use crate::pins::{self, PinStore};
 
 #[derive(Resource)]
 pub struct NavState {
@@ -143,6 +144,7 @@ pub fn render_level(
     existing: Query<Entity, With<LevelNode>>,
     asset_server: Res<AssetServer>,
     icon_cfg: Res<IconConfig>,
+    pin_store: Res<PinStore>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -158,6 +160,7 @@ pub fn render_level(
     let quad = meshes.add(Rectangle::new(2.0, 2.0));
     let hub_mat = materials.add(glow_material(Color::srgb(0.45, 0.95, 1.0), 6.0));
     let child_mat = materials.add(glow_material(Color::srgb(0.2, 0.72, 0.78), 3.0));
+    let pinned_child_mat = materials.add(glow_material(Color::srgb(1.0, 0.84, 0.3), 4.0));
     let parent_mat = materials.add(glow_material(Color::srgb(0.5, 0.55, 0.62), 1.5));
     let connector = meshes.add(Cylinder::new(0.05, 1.0));
     let connector_mat = materials.add(glow_material(Color::srgb(0.18, 0.62, 0.7), 2.2));
@@ -228,6 +231,11 @@ pub fn render_level(
         ));
 
         let visual = icons::visual_for(&child_path, &child_name, &icon_cfg);
+        let material = if pin_store.0.contains(&child_path) {
+            pinned_child_mat.clone()
+        } else {
+            child_mat.clone()
+        };
         spawn_folder_node(
             &mut commands,
             &asset_server,
@@ -239,7 +247,7 @@ pub fn render_level(
                 kind: NodeKind::Child,
                 translation: child_pos,
                 base: CHILD_RADIUS,
-                material: child_mat.clone(),
+                material,
                 sphere: sphere.clone(),
                 quad: quad.clone(),
                 visual,
@@ -566,6 +574,7 @@ pub fn open_icon_menu(
 pub fn draw_icon_menu(
     mut contexts: EguiContexts,
     mut icon_cfg: ResMut<IconConfig>,
+    mut pin_store: ResMut<PinStore>,
     mut nav: ResMut<NavState>,
     mut menu: ResMut<IconMenu>,
 ) -> Result {
@@ -661,6 +670,24 @@ pub fn draw_icon_menu(
                     );
                     ui.checkbox(&mut menu.halo, "halo");
                 });
+
+                ui.separator();
+                let is_pinned = pin_store.0.contains(&menu.path);
+                let pin_label = if is_pinned {
+                    "📌 Quitar pin"
+                } else {
+                    "📌 Pin"
+                };
+                if ui.button(pin_label).clicked() {
+                    if is_pinned {
+                        pin_store.0.remove(&menu.path);
+                    } else {
+                        pin_store.0.insert(menu.path.clone());
+                    }
+                    pins::save_pins(&pin_store.0);
+                    nav.dirty = true;
+                    close = true;
+                }
 
                 ui.separator();
                 if ui.button("Esfera default").clicked() {

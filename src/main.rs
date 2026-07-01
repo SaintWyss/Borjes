@@ -3,6 +3,7 @@
 
 mod desktop;
 mod drill;
+mod frecency;
 mod icons;
 mod interaction;
 mod layout;
@@ -87,6 +88,7 @@ fn main() {
         .insert_resource(interaction::Selected(None))
         .insert_resource(interaction::PinMenu::default())
         .insert_resource(pins::PinStore(pins::load_pins()))
+        .insert_resource(frecency::Frecency(frecency::load_frecency()))
         .insert_resource(icons::load_icon_config())
         .insert_resource(ui::SearchState::default())
         .insert_resource(ui::SearchTarget::default())
@@ -109,6 +111,7 @@ fn main() {
             EguiPrimaryContextPass,
             (
                 search::search_ui,
+                search::pin_chips,
                 drill::draw_breadcrumb,
                 drill::draw_icon_menu,
                 drill::draw_labels,
