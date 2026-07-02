@@ -80,9 +80,12 @@ fn main() {
         ))
         .insert_resource(WinitSettings {
             // Visible/focused → continuous so the dwell ring + glow animate even
-            // with the cursor held still. Hidden/unfocused → low power (idle cheap).
+            // with the cursor held still. Hidden/unfocused → low power.
+            // OJO: el SIGUSR1 de Meta+1 solo setea un AtomicBool; winit no se
+            // entera. Con 60s de sueño los toggles se perdían ("no me abre").
+            // 250ms = respuesta inmediata al atajo con idle igual de barato.
             focused_mode: UpdateMode::Continuous,
-            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_secs(60)),
+            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(250)),
         })
         .insert_resource(render::GraphData(Vec::new()))
         .insert_resource(RootConfig::default())
