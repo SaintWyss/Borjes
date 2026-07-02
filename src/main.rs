@@ -116,6 +116,7 @@ fn main() {
                 drill::draw_breadcrumb,
                 drill::draw_icon_menu,
                 drill::draw_labels,
+                drill::draw_preview_labels,
                 drill::draw_preview_overflow,
                 drill::draw_hover_ring,
             ),

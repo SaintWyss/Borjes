@@ -84,6 +84,10 @@ pub struct EchoNode;
 #[derive(Component)]
 pub struct PreviewNode;
 
+// Nombre de la subcarpeta que representa cada dendrita del preview.
+#[derive(Component)]
+pub struct PreviewLabel(pub String);
+
 #[derive(Component)]
 pub struct PreviewAnim {
     pub age: f32,
@@ -513,6 +517,7 @@ pub fn animate_camera(
     time: Res<Time>,
     target: Res<CamTarget>,
     hover: Res<HoverState>,
+    preview: Res<PreviewState>,
     children: Query<(&LevelChild, &GlobalTransform)>,
     mut cam: Query<&mut Transform, With<Camera3d>>,
     mut pan: Local<Vec2>,
@@ -523,18 +528,28 @@ pub fn animate_camera(
 
     const SPEED: f32 = 9.0;
     const PAN_SPEED: f32 = 5.0;
-    // Fraction of the way the view leans toward the hovered child. Kept gentle
-    // (mock uses 0.18) so the node doesn't slide out from under a still cursor
-    // before the dwell ring fills.
-    const LEAN: f32 = 0.12;
+    // Acercamiento progresivo: arranca con un lean suave y, mientras el hover se
+    // sostiene, la cámara va CENTRANDO el nodo y acercándose (el preview de sus
+    // hijos aparece en el camino). La histéresis de hover_track evita que el
+    // nodo "se escape" del cursor al moverse hacia el centro.
+    const LEAN_MIN: f32 = 0.12;
+    const LEAN_MAX: f32 = 0.55;
+    const ZOOM_MAX: f32 = 0.18;
 
-    // Lean target: 0 when nothing is hovered, else 18% toward the hovered child
-    // (the hub sits at the origin, so the child's world xy is the full vector).
+    // Rampa 0→1 durante ~0.5s de hover sostenido sobre el mismo hijo.
+    let ramp = match hover.target {
+        HoverTarget::Child(id) if preview.target == Some(id) => {
+            ((preview.elapsed - 0.1) / 0.5).clamp(0.0, 1.0)
+        }
+        _ => 0.0,
+    };
+    let lean = LEAN_MIN + ramp * (LEAN_MAX - LEAN_MIN);
+
     let want = match hover.target {
         HoverTarget::Child(id) => children
             .iter()
             .find(|(c, _)| c.0 == id)
-            .map(|(_, gt)| gt.translation().truncate() * LEAN)
+            .map(|(_, gt)| gt.translation().truncate() * lean)
             .unwrap_or(Vec2::ZERO),
         _ => Vec2::ZERO,
     };
@@ -544,12 +559,18 @@ pub fn animate_camera(
     *pan = cur + (want - cur) * (1.0 - (-dt * PAN_SPEED).exp());
 
     let z = cam.translation.z;
-    let eased_z = z + (target.distance - z) * (1.0 - (-dt * SPEED).exp());
+    let z_target = target.distance * (1.0 - ZOOM_MAX * ramp);
+    // Dive = rápido (SPEED); acercamiento por hover = suave (PAN_SPEED).
+    let z_rate = if ramp > 0.0 { PAN_SPEED } else { SPEED };
+    let eased_z = z + (z_target - z) * (1.0 - (-dt * z_rate).exp());
     let look = Vec3::new(pan.x, pan.y, 0.0);
     *cam = Transform::from_xyz(pan.x, pan.y, eased_z).looking_at(look, Vec3::Y);
 }
 
 const HOVER_RADIUS_PX: f32 = 95.0;
+// Radio de "soltado": más grande que el de agarre, para que el centrado de
+// cámara no corte el hover (ver histéresis en hover_track).
+const STICKY_RADIUS_PX: f32 = 230.0;
 
 // Which node (if any) is under the cursor right now.
 fn node_under_cursor(
@@ -839,7 +860,26 @@ pub fn hover_track(
         return Ok(());
     };
 
-    hover.target = node_under_cursor(cursor, camera, cam_tf, &children, &parents, &echoes);
+    let fresh = node_under_cursor(cursor, camera, cam_tf, &children, &parents, &echoes);
+
+    // Histéresis: mientras la cámara centra al hijo hovereado, el nodo se aleja
+    // del cursor quieto. Si nada nuevo cae bajo el cursor, el hijo actual sigue
+    // "agarrado" hasta que el cursor quede realmente lejos.
+    hover.target = match (fresh, hover.target) {
+        (HoverTarget::None, HoverTarget::Child(id)) => {
+            let still_close = children
+                .iter()
+                .find(|(c, _)| c.0 == id)
+                .and_then(|(_, gt)| camera.world_to_viewport(cam_tf, gt.translation()).ok())
+                .is_some_and(|screen| screen.distance(cursor) < STICKY_RADIUS_PX);
+            if still_close {
+                HoverTarget::Child(id)
+            } else {
+                HoverTarget::None
+            }
+        }
+        (fresh, _) => fresh,
+    };
     Ok(())
 }
 
@@ -950,15 +990,21 @@ pub fn update_hover_preview(
     // Anillo en el plano de pantalla (XY, la cámara mira por -Z) y como HIJOS del
     // nodo hovereado: heredan su drift y su bump, las dendritas viajan con él.
     // Empieza arriba (12 en punto) y brota en sentido horario, una por vez.
-    for idx in 0..shown {
+    for (idx, &preview_child) in own_children.iter().take(shown).enumerate() {
         let angle = std::f32::consts::FRAC_PI_2 - idx as f32 * std::f32::consts::TAU / shown as f32;
         let offset = Vec3::new(angle.cos() * 1.8, angle.sin() * 1.8, 0.35);
+        let name = nav
+            .tree
+            .node(preview_child)
+            .map(|node| node.name.clone())
+            .unwrap_or_default();
         commands.spawn((
             Mesh3d(sphere.clone()),
             MeshMaterial3d(material.clone()),
             Transform::from_translation(offset).with_scale(Vec3::ZERO),
             ChildOf(hovered_entity),
             PreviewNode,
+            PreviewLabel(name),
             PreviewAnim {
                 age: 0.0,
                 full: 0.24,
@@ -985,6 +1031,45 @@ pub fn animate_previews(
         let pop = 1.0 + 0.25 * (g * std::f32::consts::PI).sin() * (1.0 - g);
         tf.scale = Vec3::splat(anim.full * grow * pop);
     }
+}
+
+// Nombres de las subcarpetas del preview, pegados a cada dendrita. Aparecen en
+// fade siguiendo el brote de su esfera.
+pub fn draw_preview_labels(
+    mut contexts: EguiContexts,
+    cameras: Query<(&Camera, &GlobalTransform)>,
+    previews: Query<(&GlobalTransform, &PreviewLabel, &PreviewAnim)>,
+) -> Result {
+    if previews.is_empty() {
+        return Ok(());
+    }
+    let Ok((camera, cam_tf)) = cameras.single() else {
+        return Ok(());
+    };
+    let ctx = contexts.ctx_mut()?;
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("preview_labels"),
+    ));
+
+    for (gt, label, anim) in &previews {
+        let fade = ((anim.age - anim.delay) / 0.12).clamp(0.0, 1.0);
+        if fade <= 0.0 || label.0.is_empty() {
+            continue;
+        }
+        let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) else {
+            continue;
+        };
+        painter.text(
+            egui::pos2(screen.x, screen.y + 10.0),
+            egui::Align2::CENTER_TOP,
+            &label.0,
+            egui::FontId::proportional(10.5),
+            egui::Color32::from_rgba_unmultiplied(150, 225, 220, (fade * 235.0) as u8),
+        );
+    }
+
+    Ok(())
 }
 
 // Draw a reticle around the hovered (clickeable) node: two slowly-rotating arcs.
