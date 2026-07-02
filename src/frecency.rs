@@ -31,7 +31,10 @@ pub fn decayed(entry: &FrecencyEntry, now: u64) -> f64 {
 }
 
 pub fn bump(map: &mut HashMap<PathBuf, FrecencyEntry>, path: &Path, now: u64) {
-    let score = map.get(path).map(|entry| decayed(entry, now)).unwrap_or(0.0);
+    let score = map
+        .get(path)
+        .map(|entry| decayed(entry, now))
+        .unwrap_or(0.0);
     map.insert(
         path.to_path_buf(),
         FrecencyEntry {

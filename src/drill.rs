@@ -88,6 +88,8 @@ pub struct PreviewNode;
 pub struct PreviewAnim {
     pub age: f32,
     pub full: f32,
+    // Brote secuencial: cada dendrita aparece un instante después de la anterior.
+    pub delay: f32,
 }
 
 #[derive(Resource, Default)]
@@ -142,6 +144,8 @@ pub struct NodeAnim {
     // Rest position; organic drift wobbles the node around it (children only).
     pub home: Vec3,
     pub phase: f32,
+    // Grow-in stagger: la onda arranca en el hub y ondula por el anillo.
+    pub delay: f32,
 }
 
 const GROW_SECS: f32 = 0.18;
@@ -235,6 +239,7 @@ pub fn render_level(
                 quad: quad.clone(),
                 visual,
                 role: NodeRole::Hub,
+                delay: 0.0,
             },
         );
     }
@@ -299,6 +304,8 @@ pub fn render_level(
                 quad: quad.clone(),
                 visual,
                 role: NodeRole::Child(child_id),
+                // Onda: cada hijo brota un pelo después del anterior, girando el anillo.
+                delay: 0.05 + idx as f32 * 0.03,
             },
         );
     }
@@ -328,6 +335,7 @@ pub fn render_level(
                 quad: quad.clone(),
                 visual,
                 role: NodeRole::Parent,
+                delay: 0.16,
             },
         );
     }
@@ -351,6 +359,7 @@ pub fn render_level(
                 age: 0.0,
                 home: Vec3::new(0.0, 0.0, -7.0),
                 phase: 0.0,
+                delay: 0.1,
             },
             NodeLabel {
                 name: format!("\u{27f2} {name}"),
@@ -386,6 +395,7 @@ struct NodeSpawn {
     quad: Handle<Mesh>,
     visual: VisualSpec,
     role: NodeRole,
+    delay: f32,
 }
 
 fn spawn_folder_node(
@@ -406,6 +416,7 @@ fn spawn_folder_node(
                 home: spec.translation,
                 // Per-node phase offset so siblings drift out of sync.
                 phase: (spec.id as f32 * 2.399_963) % std::f32::consts::TAU,
+                delay: spec.delay,
             },
             NodeLabel {
                 name: spec.name,
@@ -884,7 +895,7 @@ pub fn update_hover_preview(
     time: Res<Time>,
     nav: Res<NavState>,
     hover: Res<HoverState>,
-    children: Query<(&LevelChild, &GlobalTransform)>,
+    children: Query<(Entity, &LevelChild, &GlobalTransform)>,
     previews: Query<Entity, With<PreviewNode>>,
     mut state: ResMut<PreviewState>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -896,8 +907,10 @@ pub fn update_hover_preview(
     };
 
     if target != state.target || nav.dirty {
+        // try_despawn: si el nivel se reconstruyó, el padre ya se llevó a las
+        // dendritas (relación ChildOf) y el despawn directo duplicaría.
         for entity in &previews {
-            commands.entity(entity).despawn();
+            commands.entity(entity).try_despawn();
         }
         state.target = target;
         state.elapsed = 0.0;
@@ -920,32 +933,36 @@ pub fn update_hover_preview(
         return;
     }
 
-    let Some((_, hovered_gt)) = children.iter().find(|(child, _)| child.0 == id) else {
+    let Some((hovered_entity, _, _)) = children.iter().find(|(_, child, _)| child.0 == id) else {
         return;
     };
 
     for entity in &previews {
-        commands.entity(entity).despawn();
+        commands.entity(entity).try_despawn();
     }
 
     let mut material = glow_material(Color::srgba(0.3, 0.9, 0.85, 0.35), 1.2);
     material.alpha_mode = AlphaMode::Blend;
     let material = materials.add(material);
     let sphere = meshes.add(Sphere::new(1.0));
-    let center = hovered_gt.translation();
     let shown = own_children.len().min(8);
 
+    // Anillo en el plano de pantalla (XY, la cámara mira por -Z) y como HIJOS del
+    // nodo hovereado: heredan su drift y su bump, las dendritas viajan con él.
+    // Empieza arriba (12 en punto) y brota en sentido horario, una por vez.
     for idx in 0..shown {
-        let angle = idx as f32 * std::f32::consts::TAU / shown as f32;
-        let offset = Vec3::new(angle.cos() * 1.6, angle.sin() * 0.28 + 0.25, angle.sin() * 1.6);
+        let angle = std::f32::consts::FRAC_PI_2 - idx as f32 * std::f32::consts::TAU / shown as f32;
+        let offset = Vec3::new(angle.cos() * 1.8, angle.sin() * 1.8, 0.35);
         commands.spawn((
             Mesh3d(sphere.clone()),
             MeshMaterial3d(material.clone()),
-            Transform::from_translation(center + offset).with_scale(Vec3::ZERO),
+            Transform::from_translation(offset).with_scale(Vec3::ZERO),
+            ChildOf(hovered_entity),
             PreviewNode,
             PreviewAnim {
                 age: 0.0,
-                full: 0.22,
+                full: 0.24,
+                delay: idx as f32 * 0.025,
             },
         ));
     }
@@ -961,15 +978,19 @@ pub fn animate_previews(
     let dt = time.delta_secs();
     for (mut tf, mut anim) in &mut previews {
         anim.age += dt;
-        let g = (anim.age / 0.12).clamp(0.0, 1.0);
+        let staggered = (anim.age - anim.delay).max(0.0);
+        let g = (staggered / 0.12).clamp(0.0, 1.0);
+        // Ease-out con mini overshoot: brota, pasa apenas y asienta.
         let grow = 1.0 - (1.0 - g).powi(3);
-        tf.scale = Vec3::splat(anim.full * grow);
+        let pop = 1.0 + 0.25 * (g * std::f32::consts::PI).sin() * (1.0 - g);
+        tf.scale = Vec3::splat(anim.full * grow * pop);
     }
 }
 
-// Draw a static highlight ring around the hovered (clickeable) node.
+// Draw a reticle around the hovered (clickeable) node: two slowly-rotating arcs.
 pub fn draw_hover_ring(
     mut contexts: EguiContexts,
+    time: Res<Time>,
     hover: Res<HoverState>,
     cameras: Query<(&Camera, &GlobalTransform)>,
     children: Query<(&LevelChild, &GlobalTransform)>,
@@ -1008,11 +1029,27 @@ pub fn draw_hover_ring(
         egui::Id::new("ring"),
     ));
 
-    // Static "clickeable" ring: marks the node a left-click would dive into.
+    // Retícula: dos arcos de 110° enfrentados que giran despacio — señala
+    // "clickeable" sin ser un círculo muerto. Halo interior tenue de apoyo.
+    let spin = time.elapsed_secs() * 0.9;
+    let stroke = egui::Stroke::new(2.5, egui::Color32::from_rgb(110, 230, 245));
+    for half in 0..2 {
+        let start = spin + half as f32 * std::f32::consts::PI;
+        let points: Vec<egui::Pos2> = (0..=18)
+            .map(|i| {
+                let a = start + i as f32 / 18.0 * 1.92; // ~110°
+                egui::pos2(center.x + a.cos() * 38.0, center.y + a.sin() * 38.0)
+            })
+            .collect();
+        painter.add(egui::Shape::line(points, stroke));
+    }
     painter.circle_stroke(
         center,
-        38.0,
-        egui::Stroke::new(2.5, egui::Color32::from_rgb(110, 230, 245)),
+        30.0,
+        egui::Stroke::new(
+            1.0,
+            egui::Color32::from_rgba_premultiplied(60, 130, 140, 90),
+        ),
     );
 
     Ok(())
@@ -1051,7 +1088,8 @@ pub fn animate_nodes(
     let t = time.elapsed_secs();
     for (mut tf, mut anim, child, parent, echo) in &mut nodes {
         anim.age += dt;
-        let g = (anim.age / GROW_SECS).clamp(0.0, 1.0);
+        let staggered = (anim.age - anim.delay).max(0.0);
+        let g = (staggered / GROW_SECS).clamp(0.0, 1.0);
         let grow = 1.0 - (1.0 - g).powi(3); // ease-out cubic
 
         let hovered = match hover.target {
@@ -1060,7 +1098,13 @@ pub fn animate_nodes(
             HoverTarget::Echo => echo.is_some(),
             HoverTarget::None => false,
         };
-        let target = anim.base * grow * if hovered { HOVER_BUMP } else { 1.0 };
+        // El eco respira despacio: recuerdo vivo, no escenografía muerta.
+        let breathe = if echo.is_some() {
+            1.0 + 0.04 * (t * 0.8).sin()
+        } else {
+            1.0
+        };
+        let target = anim.base * grow * breathe * if hovered { HOVER_BUMP } else { 1.0 };
 
         let current = tf.scale.x;
         let next = current + (target - current) * (dt * 12.0).min(1.0);
@@ -1130,6 +1174,16 @@ pub fn draw_labels(
             egui::FontId::proportional(size),
             color,
         );
+        // Carpeta sin subcarpetas: el vacío invita a actuar, no a mirar.
+        if label.kind == NodeKind::Hub && label.count == 0 {
+            painter.text(
+                egui::pos2(screen.x, screen.y + dy + 22.0),
+                egui::Align2::CENTER_TOP,
+                "sin subcarpetas · Enter la abre en el explorador",
+                egui::FontId::proportional(11.5),
+                egui::Color32::from_rgb(110, 150, 160),
+            );
+        }
     }
 
     Ok(())
@@ -1171,21 +1225,22 @@ pub fn draw_preview_overflow(
     Ok(())
 }
 
-// Breadcrumb top bar: BORJES · root / … / current.
+// Breadcrumb top bar: BORJES · root / … / current. Cada segmento es un salto:
+// click en un ancestro navega directo ahí (mismo history que el resto).
 #[allow(deprecated)] // egui marks Panel::show deprecated but show(ctx) is correct (matches ui.rs)
-pub fn draw_breadcrumb(mut contexts: EguiContexts, nav: Res<NavState>) -> Result {
-    let mut chain: Vec<String> = Vec::new();
+pub fn draw_breadcrumb(mut contexts: EguiContexts, mut nav: ResMut<NavState>) -> Result {
+    let mut chain: Vec<(usize, String)> = Vec::new();
     let mut cursor = Some(nav.current);
     while let Some(id) = cursor {
         if let Some(node) = nav.tree.node(id) {
-            chain.push(node.name.clone());
+            chain.push((id, node.name.clone()));
         }
         cursor = nav.tree.parent(id);
     }
     chain.reverse();
-    let path = chain.join("  /  ");
 
     let ctx = contexts.ctx_mut()?;
+    let mut jump = None;
     egui::TopBottomPanel::top("breadcrumb").show(ctx, |ui| {
         ui.horizontal(|ui| {
             ui.label(
@@ -1194,16 +1249,46 @@ pub fn draw_breadcrumb(mut contexts: EguiContexts, nav: Res<NavState>) -> Result
                     .color(egui::Color32::from_rgb(90, 220, 235)),
             );
             ui.label(egui::RichText::new("·").weak());
-            ui.label(egui::RichText::new(path).color(egui::Color32::from_rgb(207, 233, 245)));
+            let last = chain.len().saturating_sub(1);
+            for (pos, (id, name)) in chain.iter().enumerate() {
+                if pos == last {
+                    // El nivel actual no es un link: es donde estás parado.
+                    ui.label(
+                        egui::RichText::new(name)
+                            .strong()
+                            .color(egui::Color32::from_rgb(234, 250, 255)),
+                    );
+                } else {
+                    let seg = ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(name).color(egui::Color32::from_rgb(150, 200, 215)),
+                        )
+                        .sense(egui::Sense::click()),
+                    );
+                    if seg.hovered() {
+                        seg.clone().highlight();
+                    }
+                    if seg.clicked() {
+                        jump = Some(*id);
+                    }
+                    ui.label(egui::RichText::new("/").weak());
+                }
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
-                    egui::RichText::new("clic para entrar · ↑ padre para subir · Backspace")
-                        .weak()
-                        .size(11.0),
+                    egui::RichText::new(
+                        "clic entra · Tab entra al hover · Backspace sube · breadcrumb salta",
+                    )
+                    .weak()
+                    .size(11.0),
                 );
             });
         });
     });
+
+    if let Some(id) = jump {
+        nav.navigate(id);
+    }
 
     Ok(())
 }
