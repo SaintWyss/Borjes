@@ -1,6 +1,7 @@
 // Lints idiomáticos en Bevy (Query tuples + system-params). Allow a nivel crate.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+mod constellation;
 mod desktop;
 mod drill;
 mod frecency;
@@ -97,6 +98,7 @@ fn main() {
         .insert_resource(drill::PreviewState::default())
         .insert_resource(drill::IconMenu::default())
         .insert_resource(drill::CamTarget { distance: 60.0 })
+        .insert_resource(constellation::Constellation::default())
         .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
         .add_systems(
             Startup,
@@ -119,6 +121,7 @@ fn main() {
                 drill::draw_preview_labels,
                 drill::draw_preview_overflow,
                 drill::draw_hover_ring,
+                constellation::draw_star_labels,
             ),
         )
         .add_systems(
@@ -133,6 +136,9 @@ fn main() {
                 drill::click_dive,
                 drill::tab_hover_nav,
                 drill::render_level,
+                constellation::render_constellation,
+                constellation::animate_stars,
+                constellation::star_click,
                 drill::animate_camera,
                 drill::animate_nodes,
                 drill::animate_previews,

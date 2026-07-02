@@ -2,6 +2,7 @@ use bevy::math::Vec2;
 use std::path::Path;
 
 use crate::scan::FolderNode;
+use crate::ui::normalize;
 
 pub const RADIAL_BASE: f32 = 6.0;
 pub const RADIAL_PER_CHILD: f32 = 0.4;
@@ -9,6 +10,7 @@ pub const RADIAL_PER_CHILD: f32 = 0.4;
 pub struct FolderTree {
     nodes: Vec<FolderNode>,
     children: Vec<Vec<usize>>,
+    normalized: Vec<String>,
 }
 
 impl FolderTree {
@@ -23,7 +25,13 @@ impl FolderTree {
             }
         }
 
-        FolderTree { nodes, children }
+        let normalized = nodes.iter().map(|node| normalize(&node.name)).collect();
+
+        FolderTree {
+            nodes,
+            children,
+            normalized,
+        }
     }
 
     pub fn children(&self, id: usize) -> &[usize] {
@@ -36,6 +44,10 @@ impl FolderTree {
 
     pub fn node(&self, id: usize) -> Option<&FolderNode> {
         self.nodes.get(id)
+    }
+
+    pub fn normalized(&self, id: usize) -> Option<&str> {
+        self.normalized.get(id).map(String::as_str)
     }
 
     pub fn root(&self) -> Option<usize> {
@@ -123,6 +135,21 @@ mod tests {
         assert_eq!(tree.root(), Some(0));
         assert_eq!(tree.find_by_path(Path::new("/data/work/code")), Some(3));
         assert!(tree.children(99).is_empty());
+    }
+
+    #[test]
+    fn folder_tree_indexes_normalized_names_by_id() {
+        let mut nodes = sample_nodes();
+        nodes.push(folder_node(4, "/data/work/Código", Some(1), 2));
+        let tree = FolderTree::from_nodes(nodes);
+
+        for id in 0..tree.len() {
+            let node = tree.node(id).unwrap();
+            let expected = normalize(&node.name);
+            assert_eq!(tree.normalized(id), Some(expected.as_str()));
+        }
+        assert_eq!(tree.normalized(4), Some("codigo"));
+        assert_eq!(tree.normalized(99), None);
     }
 
     #[test]

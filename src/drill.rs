@@ -843,8 +843,14 @@ pub fn hover_track(
     children: Query<(&LevelChild, &GlobalTransform)>,
     parents: Query<&GlobalTransform, With<ParentNode>>,
     echoes: Query<&GlobalTransform, With<EchoNode>>,
+    constellation: Res<crate::constellation::Constellation>,
     mut hover: ResMut<HoverState>,
 ) -> Result {
+    // Con la constelación activa el nivel está oculto: nada hovereable.
+    if constellation.active {
+        hover.target = HoverTarget::None;
+        return Ok(());
+    }
     let Ok(window) = windows.single() else {
         return Ok(());
     };
@@ -1227,7 +1233,12 @@ pub fn draw_labels(
     mut contexts: EguiContexts,
     cameras: Query<(&Camera, &GlobalTransform)>,
     labels: Query<(&NodeLabel, &GlobalTransform)>,
+    constellation: Res<crate::constellation::Constellation>,
 ) -> Result {
+    // Nivel oculto durante la constelación: sus labels tampoco se pintan.
+    if constellation.active {
+        return Ok(());
+    }
     let Ok((camera, cam_tf)) = cameras.single() else {
         return Ok(());
     };

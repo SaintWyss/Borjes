@@ -20,33 +20,37 @@ pub struct BorjesSearch {
     pub selected: usize,
     pub results: Vec<usize>,
     prev_visible: bool,
-    focus_requested: bool,
+    pub focus_requested: bool,
     pub ascend_requested: bool,
 }
 
+// search_ui usa el camino indexado (score_normalized + all_matches); score/rank
+// quedan como API de lib y para los tests.
+#[allow(dead_code)]
 pub fn score(name: &str, query: &str) -> u32 {
-    let name = normalize(name);
-    let query = normalize(query);
+    score_normalized(&normalize(name), &normalize(query))
+}
 
-    if query.is_empty() {
+pub fn score_normalized(norm_name: &str, norm_query: &str) -> u32 {
+    if norm_query.is_empty() {
         return 0;
     }
-    if name.starts_with(&query) {
+    if norm_name.starts_with(norm_query) {
         return 3;
     }
-    if name
-        .match_indices(&query)
-        .any(|(idx, _)| idx > 0 && matches!(name.as_bytes()[idx - 1], b' ' | b'_' | b'-' | b'.'))
-    {
+    if norm_name.match_indices(norm_query).any(|(idx, _)| {
+        idx > 0 && matches!(norm_name.as_bytes()[idx - 1], b' ' | b'_' | b'-' | b'.')
+    }) {
         return 2;
     }
-    if name.contains(&query) {
+    if norm_name.contains(norm_query) {
         return 1;
     }
 
     0
 }
 
+#[allow(dead_code)]
 pub fn rank(
     tree: &FolderTree,
     query: &str,
@@ -54,10 +58,12 @@ pub fn rank(
     frec: &HashMap<PathBuf, FrecencyEntry>,
     now: u64,
 ) -> Vec<usize> {
+    let norm_query = normalize(query);
     let mut scored: Vec<(usize, u32, f64, usize, usize, String)> = (0..tree.len())
         .filter_map(|id| {
             let node = tree.node(id)?;
-            let node_score = score(&node.name, query);
+            let norm_name = tree.normalized(id)?;
+            let node_score = score_normalized(norm_name, &norm_query);
             (node_score > 0).then(|| {
                 let frecency_score = frec
                     .get(&node.path)
@@ -86,6 +92,26 @@ pub fn rank(
     scored.into_iter().map(|(id, _, _, _, _, _)| id).collect()
 }
 
+pub fn all_matches(tree: &FolderTree, query: &str, cap: usize) -> Vec<usize> {
+    let norm_query = normalize(query);
+    let mut scored: Vec<(usize, u32, usize, String)> = (0..tree.len())
+        .filter_map(|id| {
+            let node = tree.node(id)?;
+            let norm_name = tree.normalized(id)?;
+            let node_score = score_normalized(norm_name, &norm_query);
+            (node_score > 0).then(|| (id, node_score, node.depth, node.name.clone()))
+        })
+        .collect();
+
+    scored.sort_by(|a, b| {
+        b.1.cmp(&a.1)
+            .then_with(|| a.2.cmp(&b.2))
+            .then_with(|| a.3.cmp(&b.3))
+    });
+    scored.truncate(cap);
+    scored.into_iter().map(|(id, _, _, _)| id).collect()
+}
+
 pub fn short_path(path: &Path, root: &Path) -> String {
     let relative = path.strip_prefix(root).unwrap_or(path);
     let parts: Vec<String> = relative
@@ -104,8 +130,9 @@ pub fn search_ui(
     mut contexts: EguiContexts,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut search: ResMut<BorjesSearch>,
-    mut nav: ResMut<NavState>,
+    nav: ResMut<NavState>,
     mut frecency: ResMut<Frecency>,
+    mut constellation: ResMut<crate::constellation::Constellation>,
     root: Res<RootConfig>,
 ) -> Result {
     let Ok(mut window) = windows.single_mut() else {
@@ -117,6 +144,7 @@ pub fn search_ui(
         search.results.clear();
         search.selected = 0;
         search.prev_visible = false;
+        constellation.clear();
         return Ok(());
     }
 
@@ -202,35 +230,69 @@ pub fn search_ui(
         });
 
     if changed {
-        search.results = rank(
-            &nav.tree,
-            &search.query,
-            8,
-            &frecency.0,
-            frecency::now_secs(),
-        );
-        search.selected = 0;
+        if search.query.trim().is_empty() {
+            search.results.clear();
+            search.selected = 0;
+            constellation.clear();
+        } else {
+            // Fuente única: TODOS los matches del árbol. Frecuencia desempata
+            // dentro de cada score (sort estable preserva depth/name del índice).
+            let mut stars = all_matches(&nav.tree, &search.query, 64);
+            let now = frecency::now_secs();
+            let norm_query = normalize(&search.query);
+            let star_score = |id: usize| {
+                nav.tree
+                    .normalized(id)
+                    .map(|name| score_normalized(name, &norm_query))
+                    .unwrap_or(0)
+            };
+            let star_frec = |id: usize| {
+                nav.tree
+                    .node(id)
+                    .and_then(|node| frecency.0.get(&node.path))
+                    .map(|entry| frecency::decayed(entry, now))
+                    .unwrap_or(0.0)
+            };
+            stars.sort_by(|&a, &b| {
+                star_score(b).cmp(&star_score(a)).then_with(|| {
+                    star_frec(b)
+                        .partial_cmp(&star_frec(a))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+            });
+            search.results = stars.iter().take(8).copied().collect();
+            search.selected = 0;
+            constellation.set(stars);
+        }
     }
 
     let result_count = search.results.len();
-    let mut teleport = None;
     ctx.input(|input| {
-        if input.key_pressed(egui::Key::ArrowDown) && result_count > 0 {
-            search.selected = (search.selected + 1).min(result_count - 1);
+        // Tab y flechas ciclan el foco de la constelación (la lista lo espeja).
+        let step = |constellation: &mut crate::constellation::Constellation,
+                    search: &mut BorjesSearch,
+                    dir: isize| {
+            constellation.cycle(dir);
+            search.selected = constellation.focus.min(result_count.saturating_sub(1));
+        };
+        if input.key_pressed(egui::Key::Tab) && constellation.active {
+            let dir = if input.modifiers.shift { -1 } else { 1 };
+            step(&mut constellation, &mut search, dir);
         }
-        if input.key_pressed(egui::Key::ArrowUp) && result_count > 0 {
-            search.selected = search.selected.saturating_sub(1);
+        if input.key_pressed(egui::Key::ArrowDown) && constellation.active {
+            step(&mut constellation, &mut search, 1);
+        }
+        if input.key_pressed(egui::Key::ArrowUp) && constellation.active {
+            step(&mut constellation, &mut search, -1);
         }
         if input.key_pressed(egui::Key::Enter) {
             if search.query.is_empty() {
                 open_current = true;
             } else {
-                chosen = search.results.get(search.selected).copied();
+                chosen = constellation
+                    .focused()
+                    .or_else(|| search.results.get(search.selected).copied());
             }
-        }
-        // Tab = teletransporte: navegar el grafo hasta el resultado sin abrirlo.
-        if input.key_pressed(egui::Key::Tab) {
-            teleport = search.results.get(search.selected).copied();
         }
         // `!changed`: si este mismo Backspace borró el último char, la query quedó
         // vacía recién ahora — no es un pedido de subir al padre.
@@ -241,19 +303,9 @@ pub fn search_ui(
             search.query.clear();
             search.results.clear();
             search.selected = 0;
+            constellation.clear();
         }
     });
-
-    if let Some(id) = teleport {
-        if nav.tree.node(id).is_some() {
-            nav.navigate(id);
-            search.query.clear();
-            search.results.clear();
-            search.selected = 0;
-            // Mantener el foco en el buscador para seguir tipeando desde el nuevo nivel.
-            search.focus_requested = true;
-        }
-    }
 
     if let Some(path) = chosen.and_then(|id| nav.tree.node(id).map(|node| node.path.clone())) {
         frecency::bump(&mut frecency.0, &path, frecency::now_secs());
@@ -265,6 +317,7 @@ pub fn search_ui(
         search.query.clear();
         search.results.clear();
         search.selected = 0;
+        constellation.clear();
     }
 
     if open_current {
@@ -387,6 +440,32 @@ fn alt_number_pressed(input: &egui::InputState, idx: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scan::FolderNode;
+
+    fn folder_node(id: usize, name: &str, parent_id: Option<usize>, depth: usize) -> FolderNode {
+        FolderNode {
+            id,
+            path: PathBuf::from(format!("/data/{name}")),
+            name: name.to_string(),
+            parent_id,
+            root_group: 0,
+            depth,
+            child_count: 0,
+            is_symlink: false,
+            pos: [0.0; 3],
+        }
+    }
+
+    fn search_tree() -> FolderTree {
+        FolderTree::from_nodes(vec![
+            folder_node(0, "data", None, 0),
+            folder_node(1, "project", Some(0), 1),
+            folder_node(2, "other", Some(0), 1),
+            folder_node(3, "alpha project", Some(1), 2),
+            folder_node(4, "my-project", Some(2), 1),
+            folder_node(5, "deep project", Some(2), 3),
+        ])
+    }
 
     #[test]
     fn score_prioritizes_prefix_boundary_and_substring() {
@@ -395,6 +474,27 @@ mod tests {
         assert_eq!(score("archivo", "chi"), 1);
         assert_eq!(score("archivo", "zzz"), 0);
         assert_eq!(score("archivo", ""), 0);
+    }
+
+    #[test]
+    fn all_matches_returns_matches_sorted_without_frecency() {
+        let tree = search_tree();
+
+        assert_eq!(all_matches(&tree, "pro", 10), vec![1, 4, 3, 5]);
+    }
+
+    #[test]
+    fn all_matches_respects_cap() {
+        let tree = search_tree();
+
+        assert_eq!(all_matches(&tree, "pro", 2), vec![1, 4]);
+    }
+
+    #[test]
+    fn rank_uses_normalized_index_and_keeps_existing_ordering() {
+        let tree = search_tree();
+
+        assert_eq!(rank(&tree, "pro", 10, &HashMap::new(), 0), vec![1, 4, 3, 5]);
     }
 
     #[test]
