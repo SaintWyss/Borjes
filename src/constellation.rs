@@ -16,6 +16,9 @@ pub struct Constellation {
     pub dirty: bool,
     // Cuántas ramas raíz distintas aportan estrellas (para el contador).
     pub branches: usize,
+    // Tema (lente activa): título y color propios; None = búsqueda libre teal.
+    pub title: Option<String>,
+    pub color: Option<(u8, u8, u8)>,
     was_active: bool,
 }
 
@@ -25,7 +28,16 @@ impl Constellation {
         self.focus = 0;
         self.active = !stars.is_empty();
         self.stars = stars;
+        self.title = None;
+        self.color = None;
         self.dirty = true;
+    }
+
+    // Constelación temática: una lente montada como campo de estrellas.
+    pub fn set_lens(&mut self, stars: Vec<usize>, title: String, color: (u8, u8, u8)) {
+        self.set(stars);
+        self.title = Some(title);
+        self.color = Some(color);
     }
 
     pub fn clear(&mut self) {
@@ -120,9 +132,13 @@ pub fn render_constellation(
     constellation.branches = groups.len();
 
     let sphere = meshes.add(Sphere::new(1.0));
+    // Color del campo: teal en búsqueda libre, el de la lente si hay tema.
+    let (r, g, b) = constellation.color.unwrap_or((140, 250, 242));
+    let base = Color::srgb_u8(r, g, b);
+    let lin = base.to_linear();
     let mut star_mat = StandardMaterial {
-        base_color: Color::srgb(0.55, 0.98, 0.95),
-        emissive: LinearRgba::rgb(2.4, 9.0, 8.6),
+        base_color: base,
+        emissive: LinearRgba::rgb(lin.red * 4.5, lin.green * 4.5, lin.blue * 4.5),
         unlit: true,
         ..default()
     };
@@ -245,19 +261,26 @@ pub fn draw_star_labels(
         }
     }
 
-    // Contador global, arriba del campo: "N carpetas en M ramas".
-    let text = format!(
+    // Contador global, arriba del campo: "[lente —] N carpetas en M ramas".
+    let counter = format!(
         "{} carpetas en {} rama{}",
         constellation.stars.len(),
         constellation.branches,
         if constellation.branches == 1 { "" } else { "s" }
     );
+    let (text, color) = match (&constellation.title, constellation.color) {
+        (Some(title), Some((r, g, b))) => (
+            format!("◉ {title} — {counter}"),
+            egui::Color32::from_rgb(r, g, b),
+        ),
+        _ => (counter, egui::Color32::from_rgb(110, 190, 195)),
+    };
     painter.text(
         egui::pos2(ctx.content_rect().center().x, 132.0),
         egui::Align2::CENTER_TOP,
         text,
         egui::FontId::proportional(12.5),
-        egui::Color32::from_rgb(110, 190, 195),
+        color,
     );
 
     Ok(())

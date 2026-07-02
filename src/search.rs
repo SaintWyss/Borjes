@@ -133,6 +133,7 @@ pub fn search_ui(
     nav: ResMut<NavState>,
     mut frecency: ResMut<Frecency>,
     mut constellation: ResMut<crate::constellation::Constellation>,
+    lenses: Res<crate::lens::Lenses>,
     root: Res<RootConfig>,
 ) -> Result {
     let Ok(mut window) = windows.single_mut() else {
@@ -157,6 +158,7 @@ pub fn search_ui(
     let mut changed = false;
     let mut chosen = None;
     let mut open_current = false;
+    let mut lens_clicked: Option<usize> = None;
 
     egui::Area::new(egui::Id::new("borjes_search"))
         .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0))
@@ -174,7 +176,7 @@ pub fn search_ui(
                     let response = ui.add(
                         egui::TextEdit::singleline(&mut search.query)
                             .desired_width(420.0)
-                            .hint_text("Buscar carpeta…")
+                            .hint_text("Buscar carpeta…  (@lente)")
                             .text_color(egui::Color32::from_rgb(80, 230, 220)),
                     );
 
@@ -183,6 +185,29 @@ pub fn search_ui(
                         search.focus_requested = false;
                     }
                     changed = response.changed();
+
+                    // Chips de lentes: un click monta el tema entero.
+                    if !lenses.all.is_empty() {
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            for (idx, l) in lenses.all.iter().enumerate() {
+                                let (r, g, b) =
+                                    crate::lens::parse_color(&l.color).unwrap_or((140, 250, 242));
+                                let color = egui::Color32::from_rgb(r, g, b);
+                                let chip = egui::Button::new(
+                                    egui::RichText::new(format!("◉ {}", l.name))
+                                        .size(11.5)
+                                        .color(color),
+                                )
+                                .fill(egui::Color32::from_rgba_premultiplied(4, 18, 24, 200))
+                                .stroke(egui::Stroke::new(1.0, color))
+                                .corner_radius(egui::CornerRadius::same(10));
+                                if ui.add(chip).clicked() {
+                                    lens_clicked = Some(idx);
+                                }
+                            }
+                        });
+                    }
 
                     if !search.query.is_empty() {
                         ui.add_space(8.0);
@@ -229,11 +254,36 @@ pub fn search_ui(
                 });
         });
 
+    // Chip clickeado = como haber tipeado "@Lente" (mismo camino, query visible).
+    if let Some(idx) = lens_clicked {
+        if let Some(l) = lenses.all.get(idx) {
+            search.query = format!("@{}", l.name);
+            changed = true;
+            search.focus_requested = true;
+        }
+    }
+
     if changed {
         if search.query.trim().is_empty() {
             search.results.clear();
             search.selected = 0;
             constellation.clear();
+        } else if let Some(prefix) = search.query.strip_prefix('@') {
+            // "@lente": monta la lente como constelación temática en vivo.
+            match crate::lens::find_lens(&lenses.all, prefix) {
+                Some(l) => {
+                    let stars = crate::lens::lens_matches(&nav.tree, l);
+                    let color = crate::lens::parse_color(&l.color).unwrap_or((140, 250, 242));
+                    search.results = stars.iter().take(8).copied().collect();
+                    search.selected = 0;
+                    constellation.set_lens(stars, l.name.clone(), color);
+                }
+                None => {
+                    search.results.clear();
+                    search.selected = 0;
+                    constellation.clear();
+                }
+            }
         } else {
             // Fuente única: TODOS los matches del árbol. Frecuencia desempata
             // dentro de cada score (sort estable preserva depth/name del índice).

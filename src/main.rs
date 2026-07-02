@@ -8,6 +8,7 @@ mod frecency;
 mod icons;
 mod interaction;
 mod layout;
+mod lens;
 mod nav;
 mod pins;
 mod render;
@@ -99,6 +100,9 @@ fn main() {
         .insert_resource(drill::IconMenu::default())
         .insert_resource(drill::CamTarget { distance: 60.0 })
         .insert_resource(constellation::Constellation::default())
+        .insert_resource(lens::Lenses {
+            all: lens::load_lenses(),
+        })
         .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
         .add_systems(
             Startup,

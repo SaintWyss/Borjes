@@ -1232,8 +1232,10 @@ pub fn animate_connectors(
 pub fn draw_labels(
     mut contexts: EguiContexts,
     cameras: Query<(&Camera, &GlobalTransform)>,
-    labels: Query<(&NodeLabel, &GlobalTransform)>,
+    labels: Query<(&NodeLabel, &GlobalTransform, Option<&LevelFolder>)>,
     constellation: Res<crate::constellation::Constellation>,
+    lenses: Res<crate::lens::Lenses>,
+    nav: Res<NavState>,
 ) -> Result {
     // Nivel oculto durante la constelación: sus labels tampoco se pintan.
     if constellation.active {
@@ -1242,16 +1244,45 @@ pub fn draw_labels(
     let Ok((camera, cam_tf)) = cameras.single() else {
         return Ok(());
     };
+
+    // Keywords normalizadas una vez por frame: el anillo de lente es barato.
+    let lens_index: Vec<((u8, u8, u8), Vec<String>)> = lenses
+        .all
+        .iter()
+        .filter_map(|l| {
+            let color = crate::lens::parse_color(&l.color)?;
+            let kws = l.keywords.iter().map(|k| crate::ui::normalize(k)).collect();
+            Some((color, kws))
+        })
+        .collect();
     let ctx = contexts.ctx_mut()?;
     let painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Foreground,
         egui::Id::new("labels"),
     ));
 
-    for (label, gt) in &labels {
+    for (label, gt, folder) in &labels {
         let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) else {
             continue;
         };
+
+        // Miembro de una lente → anillo fino de su color (identidad temática).
+        if matches!(label.kind, NodeKind::Hub | NodeKind::Child) {
+            if let Some(folder) = folder {
+                if let Some(norm_name) = nav.tree.normalized(folder.0) {
+                    if let Some(((r, g, b), _)) = lens_index.iter().find(|(_, kws)| {
+                        kws.iter()
+                            .any(|kw| crate::search::score_normalized(norm_name, kw) > 0)
+                    }) {
+                        painter.circle_stroke(
+                            egui::pos2(screen.x, screen.y),
+                            26.0,
+                            egui::Stroke::new(1.5, egui::Color32::from_rgb(*r, *g, *b)),
+                        );
+                    }
+                }
+            }
+        }
         let text = if label.count == 0 {
             label.name.clone()
         } else {

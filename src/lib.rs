@@ -9,6 +9,7 @@ pub mod frecency;
 pub mod icons;
 pub mod interaction;
 pub mod layout;
+pub mod lens;
 pub mod nav;
 pub mod pins;
 pub mod render;
