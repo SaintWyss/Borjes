@@ -94,6 +94,7 @@ fn main() {
         .insert_resource(ui::SearchTarget::default())
         .insert_resource(search::BorjesSearch::default())
         .insert_resource(drill::HoverState::default())
+        .insert_resource(drill::PreviewState::default())
         .insert_resource(drill::IconMenu::default())
         .insert_resource(drill::CamTarget { distance: 60.0 })
         .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
@@ -115,6 +116,7 @@ fn main() {
                 drill::draw_breadcrumb,
                 drill::draw_icon_menu,
                 drill::draw_labels,
+                drill::draw_preview_overflow,
                 drill::draw_hover_ring,
             ),
         )
@@ -126,10 +128,13 @@ fn main() {
                 drill::open_icon_menu,
                 drill::ascend,
                 drill::hover_track,
+                drill::update_hover_preview,
                 drill::click_dive,
+                drill::tab_hover_nav,
                 drill::render_level,
                 drill::animate_camera,
                 drill::animate_nodes,
+                drill::animate_previews,
                 drill::animate_connectors,
                 ui::animate_camera_to_target,
             )
@@ -187,6 +192,7 @@ fn init_nav(mut commands: Commands, mut root: ResMut<RootConfig>) {
         tree,
         current,
         dirty: true,
+        history: Vec::new(),
     });
 }
 
@@ -284,6 +290,7 @@ fn handle_rescan(
         tree,
         current,
         dirty: true,
+        history: Vec::new(),
     };
 }
 

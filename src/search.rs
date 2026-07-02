@@ -246,8 +246,7 @@ pub fn search_ui(
 
     if let Some(id) = teleport {
         if nav.tree.node(id).is_some() {
-            nav.current = id;
-            nav.dirty = true;
+            nav.navigate(id);
             search.query.clear();
             search.results.clear();
             search.selected = 0;
@@ -352,8 +351,7 @@ pub fn pin_chips(
 
     if let Some(path) = teleport {
         if let Some(id) = nav.tree.find_by_path(&path) {
-            nav.current = id;
-            nav.dirty = true;
+            nav.navigate(id);
             search.query.clear();
             search.results.clear();
             search.selected = 0;

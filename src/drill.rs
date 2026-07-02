@@ -11,6 +11,31 @@ pub struct NavState {
     pub tree: nav::FolderTree,
     pub current: usize,
     pub dirty: bool,
+    pub history: Vec<usize>,
+}
+
+impl NavState {
+    pub fn navigate(&mut self, id: usize) {
+        if id == self.current {
+            return;
+        }
+
+        self.history.push(self.current);
+        if self.history.len() > 32 {
+            self.history.remove(0);
+        }
+        self.current = id;
+        self.dirty = true;
+    }
+
+    pub fn back(&mut self) {
+        let Some(previous) = self.history.pop() else {
+            return;
+        };
+
+        self.current = previous;
+        self.dirty = true;
+    }
 }
 
 #[derive(Resource)]
@@ -32,6 +57,7 @@ pub enum HoverTarget {
     None,
     Child(usize),
     Parent,
+    Echo,
 }
 
 #[derive(Resource, Default)]
@@ -51,6 +77,26 @@ pub struct LevelChild(pub usize);
 // The parent of the focus, drawn faded behind/above. Hovering it ascends.
 #[derive(Component)]
 pub struct ParentNode;
+
+#[derive(Component)]
+pub struct EchoNode;
+
+#[derive(Component)]
+pub struct PreviewNode;
+
+#[derive(Component)]
+pub struct PreviewAnim {
+    pub age: f32,
+    pub full: f32,
+}
+
+#[derive(Resource, Default)]
+pub struct PreviewState {
+    pub target: Option<usize>,
+    pub elapsed: f32,
+    pub spawned_for: Option<usize>,
+    pub overflow: Option<(usize, usize)>,
+}
 
 #[derive(Resource, Default)]
 pub struct IconMenu {
@@ -81,6 +127,7 @@ pub enum NodeKind {
     Hub,
     Child,
     Parent,
+    Echo,
 }
 
 const HUB_RADIUS: f32 = 1.4;
@@ -97,7 +144,7 @@ pub struct NodeAnim {
     pub phase: f32,
 }
 
-const GROW_SECS: f32 = 0.28;
+const GROW_SECS: f32 = 0.18;
 const HOVER_BUMP: f32 = 1.28;
 // Organic drift: children sway gently around home for the "alive neuron" feel.
 // Kept small so the field stays calm and clickable.
@@ -285,6 +332,34 @@ pub fn render_level(
         );
     }
 
+    if let Some(&prev) = nav.history.last().filter(|&&prev| prev != current) {
+        let name = nav
+            .tree
+            .node(prev)
+            .map(|node| node.name.clone())
+            .unwrap_or_else(|| format!("folder-{prev}"));
+        let mut echo_material = glow_material(Color::srgba(0.55, 0.45, 0.95, 0.12), 0.8);
+        echo_material.alpha_mode = AlphaMode::Blend;
+        commands.spawn((
+            Mesh3d(sphere.clone()),
+            MeshMaterial3d(materials.add(echo_material)),
+            Transform::from_xyz(0.0, 0.0, -7.0).with_scale(Vec3::ZERO),
+            LevelNode,
+            EchoNode,
+            NodeAnim {
+                base: 2.6,
+                age: 0.0,
+                home: Vec3::new(0.0, 0.0, -7.0),
+                phase: 0.0,
+            },
+            NodeLabel {
+                name: format!("\u{27f2} {name}"),
+                count: 0,
+                kind: NodeKind::Echo,
+            },
+        ));
+    }
+
     // Pull the perspective camera back so the whole ring frames nicely.
     let ring_radius = nav::RADIAL_BASE + nav::RADIAL_PER_CHILD * child_ids.len() as f32;
     let distance = (ring_radius + 6.0) * 2.2;
@@ -435,7 +510,7 @@ pub fn animate_camera(
         return;
     };
 
-    const SPEED: f32 = 6.0;
+    const SPEED: f32 = 9.0;
     const PAN_SPEED: f32 = 5.0;
     // Fraction of the way the view leans toward the hovered child. Kept gentle
     // (mock uses 0.18) so the node doesn't slide out from under a still cursor
@@ -472,6 +547,7 @@ fn node_under_cursor(
     cam_tf: &GlobalTransform,
     children: &Query<(&LevelChild, &GlobalTransform)>,
     parents: &Query<&GlobalTransform, With<ParentNode>>,
+    echoes: &Query<&GlobalTransform, With<EchoNode>>,
 ) -> HoverTarget {
     let mut best_child: Option<(usize, f32)> = None;
     for (child, gt) in children {
@@ -493,9 +569,20 @@ fn node_under_cursor(
         }
     }
 
+    let mut echo_d = f32::INFINITY;
+    for gt in echoes {
+        if let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation()) {
+            let d = screen.distance(cursor);
+            if d < HOVER_RADIUS_PX {
+                echo_d = echo_d.min(d);
+            }
+        }
+    }
+
     match best_child {
-        Some((id, cd)) if cd <= parent_d => HoverTarget::Child(id),
-        _ if parent_d.is_finite() => HoverTarget::Parent,
+        Some((id, cd)) if cd <= parent_d && cd <= echo_d => HoverTarget::Child(id),
+        _ if parent_d <= echo_d && parent_d.is_finite() => HoverTarget::Parent,
+        _ if echo_d.is_finite() => HoverTarget::Echo,
         _ => HoverTarget::None,
     }
 }
@@ -723,6 +810,7 @@ pub fn hover_track(
     cameras: Query<(&Camera, &GlobalTransform)>,
     children: Query<(&LevelChild, &GlobalTransform)>,
     parents: Query<&GlobalTransform, With<ParentNode>>,
+    echoes: Query<&GlobalTransform, With<EchoNode>>,
     mut hover: ResMut<HoverState>,
 ) -> Result {
     let Ok(window) = windows.single() else {
@@ -740,7 +828,7 @@ pub fn hover_track(
         return Ok(());
     };
 
-    hover.target = node_under_cursor(cursor, camera, cam_tf, &children, &parents);
+    hover.target = node_under_cursor(cursor, camera, cam_tf, &children, &parents, &echoes);
     Ok(())
 }
 
@@ -756,18 +844,127 @@ pub fn click_dive(
     }
     match hover.target {
         HoverTarget::Child(id) => {
-            nav.current = id;
-            nav.dirty = true;
+            nav.navigate(id);
         }
         HoverTarget::Parent => {
             if let Some(parent) = nav.tree.parent(nav.current) {
-                nav.current = parent;
-                nav.dirty = true;
+                nav.navigate(parent);
             }
         }
+        HoverTarget::Echo => nav.back(),
         HoverTarget::None => {}
     }
     Ok(())
+}
+
+pub fn tab_hover_nav(
+    keys: Res<ButtonInput<KeyCode>>,
+    hover: Res<HoverState>,
+    search: Res<crate::search::BorjesSearch>,
+    mut nav: ResMut<NavState>,
+) {
+    if !keys.just_pressed(KeyCode::Tab) || !search.results.is_empty() {
+        return;
+    }
+
+    match hover.target {
+        HoverTarget::Child(id) => nav.navigate(id),
+        HoverTarget::Parent => {
+            if let Some(parent) = nav.tree.parent(nav.current) {
+                nav.navigate(parent);
+            }
+        }
+        HoverTarget::Echo => nav.back(),
+        HoverTarget::None => {}
+    }
+}
+
+pub fn update_hover_preview(
+    mut commands: Commands,
+    time: Res<Time>,
+    nav: Res<NavState>,
+    hover: Res<HoverState>,
+    children: Query<(&LevelChild, &GlobalTransform)>,
+    previews: Query<Entity, With<PreviewNode>>,
+    mut state: ResMut<PreviewState>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let target = match hover.target {
+        HoverTarget::Child(id) if !nav.dirty => Some(id),
+        _ => None,
+    };
+
+    if target != state.target || nav.dirty {
+        for entity in &previews {
+            commands.entity(entity).despawn();
+        }
+        state.target = target;
+        state.elapsed = 0.0;
+        state.spawned_for = None;
+        state.overflow = None;
+    }
+
+    let Some(id) = state.target else {
+        return;
+    };
+
+    state.elapsed += time.delta_secs();
+    if state.elapsed < 0.15 || state.spawned_for == Some(id) {
+        return;
+    }
+
+    let own_children = nav.tree.children(id);
+    if own_children.is_empty() {
+        state.spawned_for = Some(id);
+        return;
+    }
+
+    let Some((_, hovered_gt)) = children.iter().find(|(child, _)| child.0 == id) else {
+        return;
+    };
+
+    for entity in &previews {
+        commands.entity(entity).despawn();
+    }
+
+    let mut material = glow_material(Color::srgba(0.3, 0.9, 0.85, 0.35), 1.2);
+    material.alpha_mode = AlphaMode::Blend;
+    let material = materials.add(material);
+    let sphere = meshes.add(Sphere::new(1.0));
+    let center = hovered_gt.translation();
+    let shown = own_children.len().min(8);
+
+    for idx in 0..shown {
+        let angle = idx as f32 * std::f32::consts::TAU / shown as f32;
+        let offset = Vec3::new(angle.cos() * 1.6, angle.sin() * 0.28 + 0.25, angle.sin() * 1.6);
+        commands.spawn((
+            Mesh3d(sphere.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::from_translation(center + offset).with_scale(Vec3::ZERO),
+            PreviewNode,
+            PreviewAnim {
+                age: 0.0,
+                full: 0.22,
+            },
+        ));
+    }
+
+    state.spawned_for = Some(id);
+    state.overflow = (own_children.len() > 8).then_some((id, own_children.len() - 8));
+}
+
+pub fn animate_previews(
+    time: Res<Time>,
+    mut previews: Query<(&mut Transform, &mut PreviewAnim), With<PreviewNode>>,
+) {
+    let dt = time.delta_secs();
+    for (mut tf, mut anim) in &mut previews {
+        anim.age += dt;
+        let g = (anim.age / 0.12).clamp(0.0, 1.0);
+        let grow = 1.0 - (1.0 - g).powi(3);
+        tf.scale = Vec3::splat(anim.full * grow);
+    }
 }
 
 // Draw a static highlight ring around the hovered (clickeable) node.
@@ -777,6 +974,7 @@ pub fn draw_hover_ring(
     cameras: Query<(&Camera, &GlobalTransform)>,
     children: Query<(&LevelChild, &GlobalTransform)>,
     parents: Query<&GlobalTransform, With<ParentNode>>,
+    echoes: Query<&GlobalTransform, With<EchoNode>>,
 ) -> Result {
     if hover.target == HoverTarget::None {
         return Ok(());
@@ -792,6 +990,7 @@ pub fn draw_hover_ring(
             .find(|(c, _)| c.0 == id)
             .map(|(_, gt)| gt.translation()),
         HoverTarget::Parent => parents.iter().next().map(|gt| gt.translation()),
+        HoverTarget::Echo => echoes.iter().next().map(|gt| gt.translation()),
         HoverTarget::None => None,
     };
     let Some(world) = world else {
@@ -832,8 +1031,7 @@ pub fn ascend(
         return;
     }
     if let Some(parent) = nav.tree.parent(nav.current) {
-        nav.current = parent;
-        nav.dirty = true;
+        nav.navigate(parent);
     }
 }
 
@@ -846,11 +1044,12 @@ pub fn animate_nodes(
         &mut NodeAnim,
         Option<&LevelChild>,
         Option<&ParentNode>,
+        Option<&EchoNode>,
     )>,
 ) {
     let dt = time.delta_secs();
     let t = time.elapsed_secs();
-    for (mut tf, mut anim, child, parent) in &mut nodes {
+    for (mut tf, mut anim, child, parent, echo) in &mut nodes {
         anim.age += dt;
         let g = (anim.age / GROW_SECS).clamp(0.0, 1.0);
         let grow = 1.0 - (1.0 - g).powi(3); // ease-out cubic
@@ -858,6 +1057,7 @@ pub fn animate_nodes(
         let hovered = match hover.target {
             HoverTarget::Child(id) => child.is_some_and(|c| c.0 == id),
             HoverTarget::Parent => parent.is_some(),
+            HoverTarget::Echo => echo.is_some(),
             HoverTarget::None => false,
         };
         let target = anim.base * grow * if hovered { HOVER_BUMP } else { 1.0 };
@@ -921,6 +1121,7 @@ pub fn draw_labels(
             NodeKind::Hub => (16.0, egui::Color32::from_rgb(234, 250, 255), 22.0),
             NodeKind::Child => (12.5, egui::Color32::from_rgb(180, 222, 232), 16.0),
             NodeKind::Parent => (12.0, egui::Color32::from_rgb(150, 160, 175), 14.0),
+            NodeKind::Echo => (12.0, egui::Color32::from_rgb(150, 135, 230), 28.0),
         };
         painter.text(
             egui::pos2(screen.x, screen.y + dy),
@@ -930,6 +1131,42 @@ pub fn draw_labels(
             color,
         );
     }
+
+    Ok(())
+}
+
+pub fn draw_preview_overflow(
+    mut contexts: EguiContexts,
+    state: Res<PreviewState>,
+    cameras: Query<(&Camera, &GlobalTransform)>,
+    children: Query<(&LevelChild, &GlobalTransform)>,
+) -> Result {
+    let Some((id, hidden)) = state.overflow else {
+        return Ok(());
+    };
+    let Ok((camera, cam_tf)) = cameras.single() else {
+        return Ok(());
+    };
+    let Some((_, gt)) = children.iter().find(|(child, _)| child.0 == id) else {
+        return Ok(());
+    };
+    let Ok(screen) = camera.world_to_viewport(cam_tf, gt.translation() + Vec3::new(1.2, 0.4, 0.0))
+    else {
+        return Ok(());
+    };
+
+    let ctx = contexts.ctx_mut()?;
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("preview_overflow"),
+    ));
+    painter.text(
+        egui::pos2(screen.x, screen.y),
+        egui::Align2::CENTER_CENTER,
+        format!("+{hidden}"),
+        egui::FontId::proportional(11.0),
+        egui::Color32::from_rgb(80, 190, 185),
+    );
 
     Ok(())
 }
@@ -969,4 +1206,105 @@ pub fn draw_breadcrumb(mut contexts: EguiContexts, nav: Res<NavState>) -> Result
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scan::FolderNode;
+    use std::path::{Path, PathBuf};
+
+    fn folder_node(id: usize, path: &str, parent_id: Option<usize>, depth: usize) -> FolderNode {
+        FolderNode {
+            id,
+            path: PathBuf::from(path),
+            name: Path::new(path)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(path)
+                .to_string(),
+            parent_id,
+            root_group: 0,
+            depth,
+            child_count: 0,
+            is_symlink: false,
+            pos: [0.0; 3],
+        }
+    }
+
+    fn nav_state() -> NavState {
+        NavState {
+            tree: crate::nav::FolderTree::from_nodes(vec![
+                folder_node(0, "/data", None, 0),
+                folder_node(1, "/data/work", Some(0), 1),
+                folder_node(2, "/data/life", Some(0), 1),
+                folder_node(3, "/data/work/code", Some(1), 2),
+            ]),
+            current: 0,
+            dirty: false,
+            history: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn navigate_pushes_current_and_marks_dirty() {
+        let mut nav = nav_state();
+
+        nav.navigate(1);
+        nav.navigate(3);
+
+        assert_eq!(nav.current, 3);
+        assert_eq!(nav.history, vec![0, 1]);
+        assert!(nav.dirty);
+    }
+
+    #[test]
+    fn navigate_same_id_is_noop() {
+        let mut nav = nav_state();
+        nav.navigate(1);
+        nav.dirty = false;
+
+        nav.navigate(1);
+
+        assert_eq!(nav.current, 1);
+        assert_eq!(nav.history, vec![0]);
+        assert!(!nav.dirty);
+    }
+
+    #[test]
+    fn navigate_caps_history_at_32_entries() {
+        let mut nav = nav_state();
+
+        for i in 0..40 {
+            nav.navigate((i % 3) + 1);
+        }
+
+        assert_eq!(nav.history.len(), 32);
+        assert_eq!(nav.history.first().copied(), Some(2));
+    }
+
+    #[test]
+    fn back_pops_without_repush() {
+        let mut nav = nav_state();
+        nav.navigate(1);
+        nav.navigate(3);
+        nav.dirty = false;
+
+        nav.back();
+        assert_eq!(nav.current, 1);
+        assert_eq!(nav.history, vec![0]);
+        assert!(nav.dirty);
+
+        nav.dirty = false;
+        nav.back();
+        assert_eq!(nav.current, 0);
+        assert!(nav.history.is_empty());
+        assert!(nav.dirty);
+
+        nav.dirty = false;
+        nav.back();
+        assert_eq!(nav.current, 0);
+        assert!(nav.history.is_empty());
+        assert!(!nav.dirty);
+    }
 }
