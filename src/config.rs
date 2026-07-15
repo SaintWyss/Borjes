@@ -110,7 +110,10 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("borjes-config-{name}-{}-{stamp}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "borjes-config-{name}-{}-{stamp}",
+            std::process::id()
+        ))
     }
 
     #[test]
