@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -46,3 +47,6 @@ jobs:
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Dependencias transitivas de Bevy. Justificación y alcance:
+          # SECURITY.md. El check seguirá bloqueando cualquier advisory nuevo.
+          ignore: RUSTSEC-2026-0204,RUSTSEC-2026-0195,RUSTSEC-2026-0194
