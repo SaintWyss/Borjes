@@ -25,8 +25,6 @@ pub fn pins_path() -> Option<PathBuf> {
     crate::config::file_path("pins.json")
 }
 
-pub fn load_pins}
-
 pub fn load_pins() -> HashSet<PathBuf> {
     pins_path().map(|path| load_from(&path)).unwrap_or_default()
 }
