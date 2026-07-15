@@ -41,7 +41,7 @@ pub fn draw_context_radar(
             egui::Frame::new()
                 .fill(egui::Color32::from_rgba_premultiplied(3, 14, 22, 210))
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     egui::Color32::from_rgb(35, 100, 112),
                 ))
                 .corner_radius(egui::CornerRadius::same(10))
@@ -72,7 +72,7 @@ pub fn draw_context_radar(
                         };
                         painter.line_segment(
                             [center, point],
-                            egui::Stroke::new(if active { 1.8 } else { 0.8 }, color),
+                            egui::Stroke::new(if active { 1.8_f32 } else { 0.8_f32 }, color),
                         );
                         painter.circle_filled(point, if active { 5.0 } else { 3.0 }, color);
                     }
