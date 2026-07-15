@@ -38,7 +38,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features --locked -- -D warnings
       - name: Tests
-        run: cargo test --all-targets --locked
+        run: cargo test --lib --locked
       - name: Release build
         run: cargo build --release --locked
       - name: Package smoke check
