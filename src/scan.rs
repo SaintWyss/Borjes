@@ -173,7 +173,7 @@ pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
         return Vec::new();
     };
 
-    entries
+    let mut files: Vec<FileEntry> = entries
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let name = entry.file_name().to_str()?.to_string();
@@ -192,9 +192,17 @@ pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
                 name,
             })
         })
-        // Locked soft cap for FILE-04: keep each burst bounded in huge directories.
-        .take(200)
-        .collect()
+        .collect();
+
+    files.sort_by(|a, b| {
+        a.name
+            .to_lowercase()
+            .cmp(&b.name.to_lowercase())
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    // Stable soft cap: huge folders always show the same deterministic slice.
+    files.truncate(200);
+    files
 }
 
 #[cfg(test)]
