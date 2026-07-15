@@ -49,26 +49,21 @@ pub fn adaptive_render_mode(
     let cursor = window.cursor_position();
     let cursor_changed = cursor != governor.last_cursor;
     let visibility_changed = window.visible != governor.was_visible;
-    let keyboard_activity = keys.get_just_pressed().next().is_some()
-        || keys.get_just_released().next().is_some();
-    let mouse_activity = mouse.get_just_pressed().next().is_some()
-        || mouse.get_just_released().next().is_some();
+    let keyboard_activity =
+        keys.get_just_pressed().next().is_some() || keys.get_just_released().next().is_some();
+    let mouse_activity =
+        mouse.get_just_pressed().next().is_some() || mouse.get_just_released().next().is_some();
 
     let state_activity = nav.is_changed() || search.is_changed();
-    if visibility_changed
-        || cursor_changed
-        || keyboard_activity
-        || mouse_activity
-        || state_activity
+    if visibility_changed || cursor_changed || keyboard_activity || mouse_activity || state_activity
     {
         governor.active_frames = SETTLE_FRAMES;
     } else {
         governor.active_frames = governor.active_frames.saturating_sub(1);
     }
 
-    let visual_activity = !matches!(hover.target, HoverTarget::None)
-        || !search.query.is_empty()
-        || nav.dirty;
+    let visual_activity =
+        !matches!(hover.target, HoverTarget::None) || !search.query.is_empty() || nav.dirty;
     let should_render_continuously =
         window.visible && (governor.active_frames > 0 || visual_activity);
 
