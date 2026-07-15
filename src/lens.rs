@@ -135,8 +135,6 @@ fn lenses_path() -> Option<PathBuf> {
     crate::config::file_path("lenses.json")
 }
 
-fn default_lenses}
-
 fn default_lenses() -> Vec<Lens> {
     vec![
         Lens {
