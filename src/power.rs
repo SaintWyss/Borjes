@@ -3,8 +3,7 @@ use bevy::window::PrimaryWindow;
 use bevy::winit::{UpdateMode, WinitSettings};
 use std::time::Duration;
 
-use crate::drill::{HoverState, HoverTarget, NavState};
-use crate::search::BorjesSearch;
+use crate::drill::NavState;
 
 const SETTLE_FRAMES: u16 = 48;
 
@@ -37,8 +36,6 @@ pub fn adaptive_render_mode(
     keys: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     nav: Res<NavState>,
-    search: Res<BorjesSearch>,
-    hover: Res<HoverState>,
     mut settings: ResMut<WinitSettings>,
     mut governor: ResMut<PowerGovernor>,
 ) {
@@ -54,18 +51,18 @@ pub fn adaptive_render_mode(
     let mouse_activity =
         mouse.get_just_pressed().next().is_some() || mouse.get_just_released().next().is_some();
 
-    let state_activity = nav.is_changed() || search.is_changed();
-    if visibility_changed || cursor_changed || keyboard_activity || mouse_activity || state_activity
-    {
+    // Native input already wakes Winit. Avoid resource change detection here:
+    // UI systems legitimately borrow these resources mutably every frame, which
+    // would otherwise keep the renderer awake even when the picture is static.
+    if visibility_changed || cursor_changed || keyboard_activity || mouse_activity {
         governor.active_frames = SETTLE_FRAMES;
     } else {
         governor.active_frames = governor.active_frames.saturating_sub(1);
     }
 
-    let visual_activity =
-        !matches!(hover.target, HoverTarget::None) || !search.query.is_empty() || nav.dirty;
-    let should_render_continuously =
-        window.visible && (governor.active_frames > 0 || visual_activity);
+    // A hovered node or a non-empty query is a static visual state, not ongoing
+    // work. The interaction that created it already funded the settle frames.
+    let should_render_continuously = window.visible && (governor.active_frames > 0 || nav.dirty);
 
     if should_render_continuously && governor.sleeping {
         settings.focused_mode = UpdateMode::Continuous;
