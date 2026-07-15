@@ -10,8 +10,9 @@ pub struct RootConfig {
 
 impl Default for RootConfig {
     fn default() -> Self {
+        let configured = crate::runtime::root_override().unwrap_or_else(|| "~/Data".to_string());
         Self {
-            path: expand_tilde("~/Data").display().to_string(),
+            path: expand_tilde(&configured).display().to_string(),
             error: None,
         }
     }
