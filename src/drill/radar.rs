@@ -53,10 +53,8 @@ pub fn draw_context_radar(
                             .color(egui::Color32::from_rgb(110, 180, 190)),
                     );
 
-                    let (rect, _) = ui.allocate_exact_size(
-                        egui::vec2(128.0, 92.0),
-                        egui::Sense::hover(),
-                    );
+                    let (rect, _) =
+                        ui.allocate_exact_size(egui::vec2(128.0, 92.0), egui::Sense::hover());
                     let painter = ui.painter_at(rect);
                     let center = rect.center();
                     painter.circle_filled(center, 3.0, egui::Color32::from_rgb(130, 245, 245));
@@ -81,9 +79,12 @@ pub fn draw_context_radar(
 
                     ui.centered_and_justified(|ui| {
                         ui.label(
-                            egui::RichText::new(format!("nivel {depth} · {} ramas", branches.len()))
-                                .size(10.0)
-                                .color(egui::Color32::from_rgb(125, 170, 178)),
+                            egui::RichText::new(format!(
+                                "nivel {depth} · {} ramas",
+                                branches.len()
+                            ))
+                            .size(10.0)
+                            .color(egui::Color32::from_rgb(125, 170, 178)),
                         );
                     });
                 });
