@@ -367,7 +367,6 @@ fn spawn_folder_node(
     });
 }
 
-
 fn importance_scale(child_count: usize, usage_score: f64) -> f32 {
     let structure = ((child_count as f32) + 1.0).ln() * 0.08;
     let usage = (usage_score.max(0.0) as f32).ln_1p() * 0.10;
