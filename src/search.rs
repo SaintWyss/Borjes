@@ -223,7 +223,10 @@ pub fn search_ui(
                                     egui::Color32::TRANSPARENT
                                 })
                                 .stroke(if selected {
-                                    egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(80, 230, 220))
+                                    egui::Stroke::new(
+                                        1.0_f32,
+                                        egui::Color32::from_rgb(80, 230, 220),
+                                    )
                                 } else {
                                     egui::Stroke::NONE
                                 })
