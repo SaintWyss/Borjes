@@ -54,7 +54,11 @@ pub fn settings_ui(
     egui::Area::new(egui::Id::new("settings_button"))
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-24.0, 22.0))
         .show(ctx, |ui| {
-            if ui.button("⚙").on_hover_text("Configuración · F10").clicked() {
+            if ui
+                .button("⚙")
+                .on_hover_text("Configuración · F10")
+                .clicked()
+            {
                 settings.open = true;
             }
         });
