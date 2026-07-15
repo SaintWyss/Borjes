@@ -12,7 +12,11 @@ pub fn config_file(name: &str) -> Option<PathBuf> {
     let legacy = base_config_dir()?.join(LEGACY_APP_DIR).join(name);
     if !current.exists() && legacy.exists() {
         if let Err(err) = migrate_file(&legacy, &current) {
-            eprintln!("borjes: could not migrate {} to {}: {err}", legacy.display(), current.display());
+            eprintln!(
+                "borjes: could not migrate {} to {}: {err}",
+                legacy.display(),
+                current.display()
+            );
         }
     }
     Some(current)
@@ -48,15 +52,24 @@ fn base_config_dir() -> Option<PathBuf> {
             return Some(PathBuf::from(config_home));
         }
     }
-    std::env::var_os("HOME").map(PathBuf::from).map(|home| home.join(".config"))
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join(".config"))
 }
 
 fn migrate_file(source: &Path, destination: &Path) -> std::io::Result<()> {
-    if destination.exists() || !source.exists() { return Ok(()); }
-    if let Some(parent) = destination.parent() { std::fs::create_dir_all(parent)?; }
+    if destination.exists() || !source.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     match std::fs::rename(source, destination) {
         Ok(()) => Ok(()),
-        Err(_) => { std::fs::copy(source, destination)?; std::fs::remove_file(source) }
+        Err(_) => {
+            std::fs::copy(source, destination)?;
+            std::fs::remove_file(source)
+        }
     }
 }
 
@@ -65,21 +78,39 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
     fn temp_dir(name: &str) -> PathBuf {
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock before epoch").as_nanos();
-        std::env::temp_dir().join(format!("borjes-config-{name}-{}-{unique}", std::process::id()))
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "borjes-config-{name}-{}-{unique}",
+            std::process::id()
+        ))
     }
     #[test]
     fn migrates_legacy_file_without_losing_contents() {
-        let root=temp_dir("migrate"); let source=root.join("legacy/lenses.json"); let destination=root.join("borjes/lenses.json");
-        std::fs::create_dir_all(source.parent().unwrap()).unwrap(); std::fs::write(&source,"important").unwrap();
-        migrate_file(&source,&destination).unwrap();
-        assert_eq!(std::fs::read_to_string(&destination).unwrap(),"important"); assert!(!source.exists()); std::fs::remove_dir_all(root).unwrap();
+        let root = temp_dir("migrate");
+        let source = root.join("legacy/lenses.json");
+        let destination = root.join("borjes/lenses.json");
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::write(&source, "important").unwrap();
+        migrate_file(&source, &destination).unwrap();
+        assert_eq!(std::fs::read_to_string(&destination).unwrap(), "important");
+        assert!(!source.exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn migration_never_overwrites_current_data() {
-        let root=temp_dir("preserve"); let source=root.join("legacy/pins.json"); let destination=root.join("borjes/pins.json");
-        std::fs::create_dir_all(source.parent().unwrap()).unwrap(); std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
-        std::fs::write(&source,"legacy").unwrap(); std::fs::write(&destination,"current").unwrap(); migrate_file(&source,&destination).unwrap();
-        assert_eq!(std::fs::read_to_string(destination).unwrap(),"current"); assert_eq!(std::fs::read_to_string(source).unwrap(),"legacy"); std::fs::remove_dir_all(root).unwrap();
+        let root = temp_dir("preserve");
+        let source = root.join("legacy/pins.json");
+        let destination = root.join("borjes/pins.json");
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::write(&source, "legacy").unwrap();
+        std::fs::write(&destination, "current").unwrap();
+        migrate_file(&source, &destination).unwrap();
+        assert_eq!(std::fs::read_to_string(destination).unwrap(), "current");
+        assert_eq!(std::fs::read_to_string(source).unwrap(), "legacy");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
