@@ -171,8 +171,6 @@ pub fn config_path() -> Option<PathBuf> {
     crate::config::file_path("icons.json")
 }
 
-pub fn user_assets_dir}
-
 pub fn user_assets_dir() -> Option<PathBuf> {
     config_path().and_then(|path| path.parent().map(|parent| parent.join("assets")))
 }
