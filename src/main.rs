@@ -15,6 +15,7 @@ mod pins;
 mod power;
 mod render;
 mod root;
+mod runtime;
 mod scan;
 mod search;
 mod ui;
@@ -70,10 +71,7 @@ fn main() {
                 // Absolute asset root so icons load no matter the cwd (autostart
                 // launches the binary from $HOME, not the repo).
                 .set(bevy::asset::AssetPlugin {
-                    file_path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("assets")
-                        .display()
-                        .to_string(),
+                    file_path: runtime::asset_root().display().to_string(),
                     unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                     ..default()
                 }),
