@@ -168,16 +168,10 @@ pub fn load_icon_assets(asset_server: Res<AssetServer>, mut commands: Commands) 
 }
 
 pub fn config_path() -> Option<PathBuf> {
-    if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-        if !config_home.is_empty() {
-            return Some(PathBuf::from(config_home).join("borjes/icons.json"));
-        }
-    }
-
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config/borjes/icons.json"))
+    crate::config::file_path("icons.json")
 }
+
+pub fn user_assets_dir}
 
 pub fn user_assets_dir() -> Option<PathBuf> {
     config_path().and_then(|path| path.parent().map(|parent| parent.join("assets")))
