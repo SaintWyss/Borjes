@@ -409,5 +409,4 @@ mod tests {
         assert_eq!(names, ["Alpha.txt", "beta.txt", "zeta.txt"]);
         fs::remove_dir_all(dir).unwrap();
     }
-
 }
