@@ -123,6 +123,7 @@ fn main() {
                 search::search_ui,
                 search::pin_chips,
                 drill::draw_breadcrumb,
+                drill::draw_context_radar,
                 drill::draw_icon_menu,
                 drill::draw_labels,
                 drill::draw_preview_labels,
