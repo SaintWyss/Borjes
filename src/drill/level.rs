@@ -243,7 +243,7 @@ pub fn render_level(
 
 fn visual_weight(child_count: usize, frecency_score: f64) -> f32 {
     let structure = (child_count as f32).ln_1p() * 0.075;
-    let usage = (frecency_score.max(0.0).min(20.0) as f32) * 0.012;
+    let usage = (frecency_score.clamp(0.0, 20.0) as f32) * 0.012;
     (1.0 + structure + usage).clamp(1.0, 1.45)
 }
 
