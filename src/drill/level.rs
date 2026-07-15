@@ -2,8 +2,8 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 
 use super::*;
-use crate::icons::{self, IconConfig, VisualKind, VisualSpec};
 use crate::frecency::{self, Frecency};
+use crate::icons::{self, IconConfig, VisualKind, VisualSpec};
 use crate::nav::{self, radial_layout};
 use crate::pins::PinStore;
 
