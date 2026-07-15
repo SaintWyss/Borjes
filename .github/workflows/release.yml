@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Native Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev             libx11-xcb-dev libxrandr-dev libxi-dev libxcursor-dev             libxinerama-dev libgl1-mesa-dev pkg-config
+      - run: cargo test --locked
+      - run: cargo build --release --locked
+      - name: Build portable archive
+        run: |
+          mkdir -p dist/borjes/assets dist/borjes/install
+          install -m755 target/release/borjes dist/borjes/borjes
+          cp -R assets/. dist/borjes/assets/
+          cp install/install.sh install/uninstall.sh install/borjes-toggle              install/borjes.desktop install/borjes.service dist/borjes/install/
+          cp README.md LICENSE dist/borjes/
+          tar -C dist -czf "borjes-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" borjes
+          sha256sum "borjes-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            borjes-*-linux-x86_64.tar.gz
+            SHA256SUMS
+          generate_release_notes: true
