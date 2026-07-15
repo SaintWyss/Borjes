@@ -64,8 +64,6 @@ fn frecency_path() -> Option<PathBuf> {
     crate::config::file_path("frecency.json")
 }
 
-fn load_from}
-
 fn load_from(path: &Path) -> std::io::Result<HashMap<PathBuf, FrecencyEntry>> {
     let text = std::fs::read_to_string(path)?;
     serde_json::from_str(&text)
