@@ -74,7 +74,10 @@ fn main() {
                     file_path: runtime::asset_root().display().to_string(),
                     unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                     ..default()
-                }),
+                })
+                // Borjes has no audio surface. Avoid opening ALSA and keeping an
+                // unused output backend alive for the lifetime of the overlay.
+                .disable::<bevy::audio::AudioPlugin>(),
             MeshPickingPlugin,
             EguiPlugin::default(),
             PanOrbitCameraPlugin,
