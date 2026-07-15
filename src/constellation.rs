@@ -256,7 +256,7 @@ pub fn draw_star_labels(
             painter.circle_stroke(
                 egui::pos2(screen.x, screen.y),
                 24.0,
-                egui::Stroke::new(2.0, egui::Color32::from_rgb(110, 230, 245)),
+                egui::Stroke::new(2.0_f32, egui::Color32::from_rgb(110, 230, 245)),
             );
         }
     }
