@@ -1,6 +1,7 @@
 // Lints idiomáticos en Bevy (Query tuples + system-params). Allow a nivel crate.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+mod config;
 mod constellation;
 mod desktop;
 mod drill;
@@ -10,11 +11,13 @@ mod interaction;
 mod layout;
 mod lens;
 mod nav;
+mod performance;
 mod pins;
 mod render;
 mod root;
 mod scan;
 mod search;
+mod settings;
 mod ui;
 
 use bevy::camera::Hdr;
@@ -24,11 +27,10 @@ use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, poll_once, AsyncComputeTaskPool, Task};
 use bevy::window::{MonitorSelection, Window, WindowMode, WindowPlugin};
-use bevy::winit::{UpdateMode, WinitSettings};
+use bevy::winit::WinitSettings;
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use std::path::PathBuf;
-use std::time::Duration;
 
 use crate::desktop::{install_signal_handler, toggle_overlay_visibility};
 use crate::root::{expand_tilde, PendingRescan, RootConfig};
@@ -67,10 +69,7 @@ fn main() {
                 // Absolute asset root so icons load no matter the cwd (autostart
                 // launches the binary from $HOME, not the repo).
                 .set(bevy::asset::AssetPlugin {
-                    file_path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("assets")
-                        .display()
-                        .to_string(),
+                    file_path: config::asset_root().display().to_string(),
                     unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                     ..default()
                 }),
@@ -78,15 +77,7 @@ fn main() {
             EguiPlugin::default(),
             PanOrbitCameraPlugin,
         ))
-        .insert_resource(WinitSettings {
-            // Visible/focused → continuous so the dwell ring + glow animate even
-            // with the cursor held still. Hidden/unfocused → low power.
-            // OJO: el SIGUSR1 de Meta+1 solo setea un AtomicBool; winit no se
-            // entera. Con 60s de sueño los toggles se perdían ("no me abre").
-            // 250ms = respuesta inmediata al atajo con idle igual de barato.
-            focused_mode: UpdateMode::Continuous,
-            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(250)),
-        })
+        .insert_resource(WinitSettings::desktop_app())
         .insert_resource(render::GraphData(Vec::new()))
         .insert_resource(RootConfig::default())
         .insert_resource(PendingRescan::default())
@@ -106,6 +97,8 @@ fn main() {
         .insert_resource(lens::Lenses {
             all: lens::load_lenses(),
         })
+        .insert_resource(performance::RenderGovernor::default())
+        .insert_resource(settings::SettingsState::default())
         .insert_resource(ClearColor(Color::srgb(0.01, 0.02, 0.04)))
         .add_systems(
             Startup,
@@ -115,6 +108,7 @@ fn main() {
                 render::setup_pin_assets,
                 icons::load_icon_assets,
                 init_nav,
+                desktop::start_signal_wakeup,
             ),
         )
         .add_systems(
@@ -122,6 +116,7 @@ fn main() {
             (
                 search::search_ui,
                 search::pin_chips,
+                settings::settings_ui,
                 drill::draw_breadcrumb,
                 drill::draw_icon_menu,
                 drill::draw_labels,
@@ -135,6 +130,7 @@ fn main() {
             Update,
             (
                 toggle_overlay_visibility,
+                performance::govern_rendering,
                 handle_rescan,
                 drill::open_icon_menu,
                 drill::ascend,

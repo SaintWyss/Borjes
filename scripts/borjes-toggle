@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+if ! pgrep -x borjes >/dev/null 2>&1; then
+    systemctl --user start borjes.service
+    attempts=0
+    while ! pgrep -x borjes >/dev/null 2>&1; do
+        attempts=$((attempts + 1))
+        [ "$attempts" -ge 50 ] && exit 1
+        sleep 0.05
+    done
+fi
+
+pkill -USR1 -x borjes

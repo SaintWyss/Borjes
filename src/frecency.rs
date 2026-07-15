@@ -61,15 +61,7 @@ pub fn save_frecency(map: &HashMap<PathBuf, FrecencyEntry>) {
 }
 
 fn frecency_path() -> Option<PathBuf> {
-    if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-        if !config_home.is_empty() {
-            return Some(PathBuf::from(config_home).join("datatree-rs/frecency.json"));
-        }
-    }
-
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config/datatree-rs/frecency.json"))
+    crate::config::config_file("frecency.json")
 }
 
 fn load_from(path: &Path) -> std::io::Result<HashMap<PathBuf, FrecencyEntry>> {

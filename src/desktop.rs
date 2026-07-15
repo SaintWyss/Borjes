@@ -1,23 +1,79 @@
 use bevy::ecs::system::NonSendMarker;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use bevy::winit::WINIT_WINDOWS;
-use std::sync::atomic::{AtomicBool, Ordering};
+use bevy::winit::{EventLoopProxyWrapper, WinitUserEvent, WINIT_WINDOWS};
+use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
-static TOGGLE_REQUESTED: AtomicBool = AtomicBool::new(false);
+static TOGGLE_REQUESTS: AtomicUsize = AtomicUsize::new(0);
+static SIGNAL_READ_FD: AtomicI32 = AtomicI32::new(-1);
+static SIGNAL_WRITE_FD: AtomicI32 = AtomicI32::new(-1);
 
 extern "C" fn handle_sigusr1(_sig: i32) {
-    TOGGLE_REQUESTED.store(true, Ordering::SeqCst);
+    TOGGLE_REQUESTS.fetch_add(1, Ordering::SeqCst);
+    let fd = SIGNAL_WRITE_FD.load(Ordering::Relaxed);
+    if fd >= 0 {
+        let byte = 1_u8;
+        // SAFETY: write(2) is async-signal-safe; the non-blocking pipe ensures
+        // the handler can never wait behind the render thread.
+        unsafe {
+            libc::write(fd, (&byte as *const u8).cast(), 1);
+        }
+    }
 }
 
 pub fn install_signal_handler() {
-    // SAFETY: handler only does an atomic store, async-signal-safe.
+    let mut fds = [-1_i32; 2];
+    // SAFETY: fds points to two valid integers. The read side remains blocking;
+    // only the signal-handler write side is made non-blocking.
     unsafe {
+        if libc::pipe(fds.as_mut_ptr()) == 0 {
+            let flags = libc::fcntl(fds[1], libc::F_GETFL);
+            if flags >= 0 {
+                libc::fcntl(fds[1], libc::F_SETFL, flags | libc::O_NONBLOCK);
+            }
+            SIGNAL_READ_FD.store(fds[0], Ordering::Release);
+            SIGNAL_WRITE_FD.store(fds[1], Ordering::Release);
+        }
         libc::signal(
             libc::SIGUSR1,
             handle_sigusr1 as *const () as libc::sighandler_t,
         );
     }
+}
+
+/// Bridges Unix signals into winit user events. This lets the hidden overlay use
+/// `WinitSettings::desktop_app()` and sleep for real instead of polling at 4 Hz.
+pub fn start_signal_wakeup(event_loop: Res<EventLoopProxyWrapper>) {
+    let read_fd = SIGNAL_READ_FD.swap(-1, Ordering::AcqRel);
+    if read_fd < 0 {
+        warn!("signal wake-up pipe unavailable; toggle latency may increase");
+        return;
+    }
+
+    let event_loop = (*event_loop).clone();
+    std::thread::Builder::new()
+        .name("borjes-signal-wakeup".to_string())
+        .spawn(move || {
+            let mut byte = 0_u8;
+            loop {
+                // SAFETY: read_fd is owned by this thread and byte is a valid
+                // one-byte output buffer. The descriptor closes with process exit.
+                let read = unsafe { libc::read(read_fd, (&mut byte as *mut u8).cast(), 1) };
+                if read == 1 {
+                    if event_loop.send_event(WinitUserEvent::WakeUp).is_err() {
+                        break;
+                    }
+                } else if read == 0 {
+                    break;
+                } else {
+                    let err = std::io::Error::last_os_error();
+                    if err.kind() != std::io::ErrorKind::Interrupted {
+                        break;
+                    }
+                }
+            }
+        })
+        .expect("failed to start signal wake-up bridge");
 }
 
 pub fn toggle_overlay_visibility(
@@ -31,7 +87,7 @@ pub fn toggle_overlay_visibility(
         return;
     };
 
-    if TOGGLE_REQUESTED.swap(false, Ordering::SeqCst) {
+    if TOGGLE_REQUESTS.swap(0, Ordering::SeqCst) % 2 == 1 {
         window.visible = !window.visible;
         if window.visible {
             window.focused = true;
