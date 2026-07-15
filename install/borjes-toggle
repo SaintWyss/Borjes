@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! pgrep -x borjes >/dev/null; then
+    systemctl --user start borjes.service
+    for _ in {1..40}; do
+        pgrep -x borjes >/dev/null && break
+        sleep 0.05
+    done
+fi
+
+pkill -USR1 -x borjes
