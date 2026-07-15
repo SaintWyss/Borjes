@@ -173,7 +173,7 @@ pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
         return Vec::new();
     };
 
-    entries
+    let mut files: Vec<FileEntry> = entries
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let name = entry.file_name().to_str()?.to_string();
@@ -192,9 +192,18 @@ pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
                 name,
             })
         })
-        // Locked soft cap for FILE-04: keep each burst bounded in huge directories.
-        .take(200)
-        .collect()
+        .collect();
+
+    // read_dir order is filesystem-dependent. Sort before applying the visual
+    // cap so the same directory always produces the same burst.
+    files.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    files.truncate(200);
+    files
 }
 
 #[cfg(test)]
@@ -385,4 +394,20 @@ mod tests {
             "child_count totales no coinciden con cantidad de nodos con padre"
         );
     }
+    #[test]
+    fn scan_files_is_deterministic_and_sorted() {
+        let dir = temp_scan_dir("sorted");
+        File::create(dir.join("zeta.txt")).unwrap();
+        File::create(dir.join("Alpha.txt")).unwrap();
+        File::create(dir.join("beta.txt")).unwrap();
+
+        let names: Vec<String> = scan_files(&dir)
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+
+        assert_eq!(names, ["Alpha.txt", "beta.txt", "zeta.txt"]);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
 }
