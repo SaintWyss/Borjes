@@ -1,23 +1,52 @@
 use bevy::ecs::system::NonSendMarker;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use bevy::winit::WINIT_WINDOWS;
+use bevy::winit::{EventLoopProxyWrapper, WinitUserEvent, WINIT_WINDOWS};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static TOGGLE_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-extern "C" fn handle_sigusr1(_sig: i32) {
-    TOGGLE_REQUESTED.store(true, Ordering::SeqCst);
+/// Blocks SIGUSR1 in every subsequently-created thread. A dedicated sigwait
+/// thread consumes it later, so no async signal handler or polling is needed.
+pub fn install_signal_handler() {
+    unsafe {
+        let mut signals = std::mem::zeroed();
+        libc::sigemptyset(&mut signals);
+        libc::sigaddset(&mut signals, libc::SIGUSR1);
+        let result = libc::pthread_sigmask(libc::SIG_BLOCK, &signals, std::ptr::null_mut());
+        if result != 0 {
+            eprintln!("borjes: could not block SIGUSR1 ({result})");
+        }
+    }
 }
 
-pub fn install_signal_handler() {
-    // SAFETY: handler only does an atomic store, async-signal-safe.
-    unsafe {
-        libc::signal(
-            libc::SIGUSR1,
-            handle_sigusr1 as *const () as libc::sighandler_t,
-        );
-    }
+/// Waits without consuming CPU and wakes Bevy exactly when SIGUSR1 arrives.
+pub fn start_signal_listener(proxy: Res<EventLoopProxyWrapper>) {
+    let proxy: winit::event_loop::EventLoopProxy<WinitUserEvent> = (**proxy).clone();
+
+    let _ = std::thread::Builder::new()
+        .name("borjes-signal-listener".to_string())
+        .spawn(move || loop {
+            let mut signal = 0;
+            let result = unsafe {
+                let mut signals = std::mem::zeroed();
+                libc::sigemptyset(&mut signals);
+                libc::sigaddset(&mut signals, libc::SIGUSR1);
+                libc::sigwait(&signals, &mut signal)
+            };
+
+            if result != 0 {
+                eprintln!("borjes: sigwait failed ({result})");
+                break;
+            }
+
+            if signal == libc::SIGUSR1 {
+                TOGGLE_REQUESTED.store(true, Ordering::Release);
+                if proxy.send_event(WinitUserEvent::WakeUp).is_err() {
+                    break;
+                }
+            }
+        });
 }
 
 pub fn toggle_overlay_visibility(
@@ -31,7 +60,7 @@ pub fn toggle_overlay_visibility(
         return;
     };
 
-    if TOGGLE_REQUESTED.swap(false, Ordering::SeqCst) {
+    if TOGGLE_REQUESTED.swap(false, Ordering::AcqRel) {
         window.visible = !window.visible;
         if window.visible {
             window.focused = true;
@@ -39,21 +68,13 @@ pub fn toggle_overlay_visibility(
         }
     }
 
-    // KWin no da foco de teclado al re-mapear una ventana ya existente (focus
-    // stealing prevention): el primer show tras el launch enfoca, los siguientes
-    // no. Pedir el foco a winit durante unos frames post-show (cuando la ventana
-    // ya está mapeada) para que Meta+1 → tipear funcione siempre.
-    //
-    // Además X11 LIMPIA _NET_WM_STATE_ABOVE al hacer unmap: si no se re-aplica,
-    // el overlay re-aparece DEBAJO de las demás ventanas ("no me abre"). Se
-    // re-pide always-on-top directo a winit durante los mismos frames.
+    // KWin does not restore focus/ABOVE after an X11 unmap. Re-apply both
+    // briefly after showing, once the native window has been mapped again.
     if *focus_frames > 0 && window.visible {
         *focus_frames -= 1;
         WINIT_WINDOWS.with_borrow(|winit_windows| {
             if let Some(winit_window) = winit_windows.get_window(entity) {
                 winit_window.focus_window();
-                // Directo a winit: Bevy cachea el campo y no re-aplica valores
-                // "iguales", pero X11 ya descartó el ABOVE en el unmap.
                 winit_window.set_window_level(winit::window::WindowLevel::AlwaysOnTop);
             }
         });

@@ -22,15 +22,7 @@ pub fn save_pins(pins: &HashSet<PathBuf>) {
 
 #[allow(dead_code)] // Shared config path is consumed by 08-02/08-03 pin workflows.
 pub fn pins_path() -> Option<PathBuf> {
-    if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-        if !config_home.is_empty() {
-            return Some(PathBuf::from(config_home).join("borjes/pins.json"));
-        }
-    }
-
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config/borjes/pins.json"))
+    crate::config::file_path("pins.json")
 }
 
 pub fn load_pins() -> HashSet<PathBuf> {

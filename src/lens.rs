@@ -132,15 +132,7 @@ pub fn find_lens<'a>(lenses: &'a [Lens], prefix: &str) -> Option<&'a Lens> {
 }
 
 fn lenses_path() -> Option<PathBuf> {
-    if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-        if !config_home.is_empty() {
-            return Some(PathBuf::from(config_home).join("datatree-rs/lenses.json"));
-        }
-    }
-
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config/datatree-rs/lenses.json"))
+    crate::config::file_path("lenses.json")
 }
 
 fn default_lenses() -> Vec<Lens> {

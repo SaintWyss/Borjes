@@ -1,6 +1,7 @@
 // Lints idiomáticos en Bevy (Query tuples + system-params). Allow a nivel crate.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+mod config;
 mod constellation;
 mod desktop;
 mod drill;
@@ -11,8 +12,10 @@ mod layout;
 mod lens;
 mod nav;
 mod pins;
+mod power;
 mod render;
 mod root;
+mod runtime;
 mod scan;
 mod search;
 mod ui;
@@ -30,7 +33,7 @@ use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::desktop::{install_signal_handler, toggle_overlay_visibility};
+use crate::desktop::{install_signal_handler, start_signal_listener, toggle_overlay_visibility};
 use crate::root::{expand_tilde, PendingRescan, RootConfig};
 use crate::scan::FolderNode;
 
@@ -50,6 +53,7 @@ fn main() {
     // ~1-2s). Otherwise a USR1 arriving in that window hits the default
     // disposition (terminate) and the overlay dies — "se cierra y no abre".
     install_signal_handler();
+    config::migrate_legacy();
 
     App::new()
         .add_plugins((
@@ -67,29 +71,27 @@ fn main() {
                 // Absolute asset root so icons load no matter the cwd (autostart
                 // launches the binary from $HOME, not the repo).
                 .set(bevy::asset::AssetPlugin {
-                    file_path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("assets")
-                        .display()
-                        .to_string(),
+                    file_path: runtime::asset_root().display().to_string(),
                     unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                     ..default()
-                }),
+                })
+                // Borjes has no audio surface. Avoid opening ALSA and keeping an
+                // unused output backend alive for the lifetime of the overlay.
+                .disable::<bevy::audio::AudioPlugin>(),
             MeshPickingPlugin,
             EguiPlugin::default(),
             PanOrbitCameraPlugin,
         ))
         .insert_resource(WinitSettings {
-            // Visible/focused → continuous so the dwell ring + glow animate even
-            // with the cursor held still. Hidden/unfocused → low power.
-            // OJO: el SIGUSR1 de Meta+1 solo setea un AtomicBool; winit no se
-            // entera. Con 60s de sueño los toggles se perdían ("no me abre").
-            // 250ms = respuesta inmediata al atajo con idle igual de barato.
-            focused_mode: UpdateMode::Continuous,
-            unfocused_mode: UpdateMode::reactive_low_power(Duration::from_millis(250)),
+            // True zero-idle: the signal bridge and native input wake the event
+            // loop. No periodic timer runs while hidden or visually settled.
+            focused_mode: UpdateMode::reactive(Duration::MAX),
+            unfocused_mode: UpdateMode::reactive_low_power(Duration::MAX),
         })
         .insert_resource(render::GraphData(Vec::new()))
         .insert_resource(RootConfig::default())
         .insert_resource(PendingRescan::default())
+        .insert_resource(power::PowerGovernor::default())
         .insert_resource(interaction::Selected(None))
         .insert_resource(interaction::PinMenu::default())
         .insert_resource(pins::PinStore(pins::load_pins()))
@@ -115,6 +117,7 @@ fn main() {
                 render::setup_pin_assets,
                 icons::load_icon_assets,
                 init_nav,
+                start_signal_listener,
             ),
         )
         .add_systems(
@@ -123,6 +126,7 @@ fn main() {
                 search::search_ui,
                 search::pin_chips,
                 drill::draw_breadcrumb,
+                drill::draw_context_radar,
                 drill::draw_icon_menu,
                 drill::draw_labels,
                 drill::draw_preview_labels,
@@ -151,6 +155,7 @@ fn main() {
                 drill::animate_previews,
                 drill::animate_connectors,
                 ui::animate_camera_to_target,
+                power::adaptive_render_mode,
             )
                 .chain(),
         )

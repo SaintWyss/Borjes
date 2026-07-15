@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "agent/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Native Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev \
+            libx11-xcb-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libxinerama-dev libgl1-mesa-dev pkg-config
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - name: Tests
+        run: cargo test --lib --locked
+      - name: Release build
+        run: cargo build --release --locked
+      - name: Package smoke check
+        run: |
+          test -x target/release/borjes
+          test -d assets
+          bash -n install/install.sh
+          bash -n install/uninstall.sh
+          bash -n install/borjes-toggle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: borjes-linux-x86_64
+          path: target/release/borjes
+          if-no-files-found: error
+          retention-days: 14
+
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # wayland-scanner 0.31.10 uses quick-xml only at compile time to
+          # parse trusted protocol XML. Remove after its 0.41-based release.
+          # Full threat analysis and removal condition: docs/SECURITY.md.
+          ignore: RUSTSEC-2026-0194,RUSTSEC-2026-0195

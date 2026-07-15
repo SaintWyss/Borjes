@@ -2,6 +2,7 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 
 use super::*;
+use crate::frecency::{self, Frecency};
 use crate::icons::{self, IconConfig, VisualKind, VisualSpec};
 use crate::nav::{self, radial_layout};
 use crate::pins::PinStore;
@@ -46,6 +47,7 @@ pub fn render_level(
     asset_server: Res<AssetServer>,
     icon_cfg: Res<IconConfig>,
     pin_store: Res<PinStore>,
+    frecency_store: Res<Frecency>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cache: Local<Option<CachedLevelAssets>>,
@@ -64,12 +66,18 @@ pub fn render_level(
         .clone();
 
     let current = nav.current;
+    let now = frecency::now_secs();
     let child_ids = nav.tree.children(current).to_vec();
     let positions = radial_layout(child_ids.len());
 
     // Hub = focus node at the origin.
     if let Some(node) = nav.tree.node(current) {
         let visual = icons::visual_for(&node.path, &node.name, &icon_cfg);
+        let usage = frecency_store
+            .0
+            .get(&node.path)
+            .map(|entry| frecency::decayed(entry, now))
+            .unwrap_or_default();
         spawn_folder_node(
             &mut commands,
             &asset_server,
@@ -80,7 +88,7 @@ pub fn render_level(
                 count: child_ids.len(),
                 kind: NodeKind::Hub,
                 translation: Vec3::ZERO,
-                base: HUB_RADIUS,
+                base: HUB_RADIUS * importance_scale(child_ids.len(), usage),
                 material: assets.hub_mat.clone(),
                 sphere: assets.sphere.clone(),
                 quad: assets.quad.clone(),
@@ -130,6 +138,11 @@ pub fn render_level(
         ));
 
         let visual = icons::visual_for(&child_path, &child_name, &icon_cfg);
+        let usage = frecency_store
+            .0
+            .get(&child_path)
+            .map(|entry| frecency::decayed(entry, now))
+            .unwrap_or_default();
         let material = if pin_store.0.contains(&child_path) {
             assets.pinned_mat.clone()
         } else {
@@ -145,7 +158,7 @@ pub fn render_level(
                 count: grandchildren,
                 kind: NodeKind::Child,
                 translation: child_pos,
-                base: CHILD_RADIUS,
+                base: CHILD_RADIUS * importance_scale(grandchildren, usage),
                 material,
                 sphere: assets.sphere.clone(),
                 quad: assets.quad.clone(),
@@ -352,4 +365,27 @@ fn spawn_folder_node(
             }
         }
     });
+}
+
+fn importance_scale(child_count: usize, usage_score: f64) -> f32 {
+    let structure = ((child_count as f32) + 1.0).ln() * 0.08;
+    let usage = (usage_score.max(0.0) as f32).ln_1p() * 0.10;
+    (1.0 + structure + usage).clamp(1.0, 1.5)
+}
+
+#[cfg(test)]
+mod importance_tests {
+    use super::importance_scale;
+
+    #[test]
+    fn importance_is_bounded_and_monotonic() {
+        let baseline = importance_scale(0, 0.0);
+        let structural = importance_scale(20, 0.0);
+        let frequently_used = importance_scale(20, 25.0);
+
+        assert_eq!(baseline, 1.0);
+        assert!(structural > baseline);
+        assert!(frequently_used > structural);
+        assert!(importance_scale(usize::MAX, f64::MAX) <= 1.5);
+    }
 }

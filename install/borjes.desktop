@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Borjes
+Comment=Mapa visual instantáneo de tus carpetas
+Exec=@PREFIX@/bin/borjes-toggle
+Icon=system-file-manager
+Terminal=false
+Categories=Utility;FileManager;
+StartupNotify=false

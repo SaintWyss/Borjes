@@ -8,6 +8,7 @@ mod hover;
 mod level;
 mod overlay;
 mod preview;
+mod radar;
 
 pub use anim::*;
 pub use camera::*;
@@ -15,6 +16,7 @@ pub use hover::*;
 pub use level::*;
 pub use overlay::*;
 pub use preview::*;
+pub use radar::*;
 
 #[derive(Resource)]
 pub struct NavState {

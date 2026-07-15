@@ -1,0 +1,15 @@
+[Unit]
+Description=Borjes visual file navigator
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@PREFIX@/bin/borjes
+Environment=BORJES_ASSET_DIR=@PREFIX@/share/borjes/assets
+Restart=on-failure
+RestartSec=2
+Nice=5
+
+[Install]
+WantedBy=default.target

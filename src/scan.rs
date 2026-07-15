@@ -173,7 +173,7 @@ pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
         return Vec::new();
     };
 
-    entries
+    let mut files: Vec<FileEntry> = entries
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let name = entry.file_name().to_str()?.to_string();
@@ -192,20 +192,26 @@ pub fn scan_files(dir: &Path) -> Vec<FileEntry> {
                 name,
             })
         })
-        // Locked soft cap for FILE-04: keep each burst bounded in huge directories.
-        .take(200)
-        .collect()
+        .collect();
+
+    // read_dir order is filesystem-dependent. Sort before applying the visual
+    // cap so the same directory always produces the same burst.
+    files.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    files.truncate(200);
+    files
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::{self, File};
+    use std::os::unix::fs::symlink;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn data_path() -> PathBuf {
-        PathBuf::from(std::env::var("HOME").expect("HOME not set")).join("Data")
-    }
 
     fn temp_scan_dir(name: &str) -> PathBuf {
         let unique = SystemTime::now()
@@ -268,121 +274,66 @@ mod tests {
 
     #[test]
     fn scan_files_returns_empty_for_missing_dir() {
-        let dir = std::env::temp_dir().join(format!("borjes-missing-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "borjes-missing-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock before UNIX_EPOCH")
+                .as_nanos()
+        ));
         let _ = fs::remove_dir_all(&dir);
 
         assert!(scan_files(&dir).is_empty());
     }
 
     #[test]
-    fn test_scan_count() {
-        let nodes = scan_folder(&data_path());
-        // El roadmap estimó ~604 nodos, pero ese número venía de un preview
-        // capeado a profundidad 5. El árbol real de ~/Data a profundidad
-        // completa (sin ocultos, sin gitignored, con EXCLUDED) ronda los 4600.
-        assert!(
-            nodes.len() >= 4300 && nodes.len() <= 4900,
-            "Expected current ~/Data scan to be ~4.6k nodes, got {}",
-            nodes.len()
-        );
+    fn scan_files_is_deterministic_and_sorted() {
+        let dir = temp_scan_dir("sorted");
+        File::create(dir.join("zeta.txt")).unwrap();
+        File::create(dir.join("Alpha.txt")).unwrap();
+        File::create(dir.join("beta.txt")).unwrap();
+
+        let names: Vec<String> = scan_files(&dir)
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+
+        assert_eq!(names, ["Alpha.txt", "beta.txt", "zeta.txt"]);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
-    fn test_no_excluded_dirs() {
-        let nodes = scan_folder(&data_path());
+    fn scan_folder_builds_consistent_tree_from_fixture() {
+        let dir = temp_scan_dir("tree");
+        fs::create_dir_all(dir.join("alpha/child")).unwrap();
+        fs::create_dir_all(dir.join("beta/child/grandchild")).unwrap();
+        fs::create_dir_all(dir.join("node_modules/noise")).unwrap();
+        fs::create_dir_all(dir.join(".hidden/noise")).unwrap();
+        symlink(dir.join("alpha"), dir.join("alpha-link")).unwrap();
 
-        for name in EXCLUDED {
-            assert!(
-                !nodes.iter().any(|node| node.name == *name),
-                "Found excluded dir '{name}' in results"
-            );
-        }
-    }
+        let nodes = scan_folder(&dir);
 
-    #[test]
-    fn test_symlink_01_now_once() {
-        let nodes = scan_folder(&data_path());
-        let matching: Vec<&FolderNode> =
-            nodes.iter().filter(|node| node.name == "01_Now").collect();
-
-        assert_eq!(
-            matching.len(),
-            1,
-            "01_Now debe aparecer exactamente una vez"
-        );
-
-        let actual_01_now_is_symlink = std::fs::symlink_metadata(&matching[0].path)
-            .map(|metadata| metadata.file_type().is_symlink())
-            .unwrap_or(false);
-
-        if actual_01_now_is_symlink {
-            assert!(matching[0].is_symlink, "01_Now debe tener is_symlink=true");
-        } else {
-            // In this real ~/Data snapshot, 01_Now is a normal directory and
-            // contains symlink children instead of being the symlink itself.
-            assert!(
-                !matching[0].is_symlink,
-                "01_Now no debe marcarse como symlink si el FS real no lo es"
-            );
-            assert!(
-                nodes.iter().any(|node| node.is_symlink),
-                "Debe existir al menos un symlink real a directorio en ~/Data"
-            );
-        }
-    }
-
-    #[test]
-    fn test_root_node_depth_zero() {
-        let nodes = scan_folder(&data_path());
-        let roots: Vec<&FolderNode> = nodes.iter().filter(|node| node.depth == 0).collect();
-
-        assert_eq!(
-            roots.len(),
-            1,
-            "Debe haber exactamente un nodo raíz depth=0"
-        );
-        assert_eq!(roots[0].parent_id, None);
-    }
-
-    #[test]
-    fn test_parent_ids_non_root() {
-        let nodes = scan_folder(&data_path());
-
-        nodes.iter().filter(|node| node.depth > 0).for_each(|node| {
-            assert!(
-                node.parent_id.is_some(),
-                "Nodo {} depth={} no tiene parent_id",
-                node.name,
-                node.depth
-            );
-        });
-    }
-
-    #[test]
-    fn test_root_groups_depth1() {
-        let nodes = scan_folder(&data_path());
-
-        nodes
+        assert_eq!(nodes.iter().filter(|node| node.depth == 0).count(), 1);
+        let root = nodes.iter().find(|node| node.depth == 0).unwrap();
+        assert_eq!(root.parent_id, None);
+        assert!(!nodes.iter().any(|node| node.name == "node_modules"));
+        assert!(!nodes.iter().any(|node| node.name == ".hidden"));
+        assert!(nodes
             .iter()
-            .filter(|node| node.depth == 1)
-            .for_each(|node| {
-                assert_eq!(
-                    node.root_group, node.id,
-                    "depth-1 node {} tiene root_group={} pero esperado {}",
-                    node.name, node.root_group, node.id
-                );
-            });
-    }
+            .any(|node| node.name == "alpha-link" && node.is_symlink));
 
-    #[test]
-    fn test_child_counts_consistent() {
-        let nodes = scan_folder(&data_path());
+        for node in nodes.iter().filter(|node| node.depth > 0) {
+            assert!(node.parent_id.is_some(), "{} has no parent", node.name);
+        }
+        for node in nodes.iter().filter(|node| node.depth == 1) {
+            assert_eq!(node.root_group, node.id);
+        }
+
         let total_child_counts: usize = nodes.iter().map(|node| node.child_count).sum();
         let nodes_with_parent = nodes.iter().filter(|node| node.parent_id.is_some()).count();
+        assert_eq!(total_child_counts, nodes_with_parent);
 
-        assert_eq!(
-            total_child_counts, nodes_with_parent,
-            "child_count totales no coinciden con cantidad de nodos con padre"
-        );
+        fs::remove_dir_all(dir).unwrap();
     }
 }
