@@ -1,8 +1,8 @@
 // Lints idiomáticos en Bevy (Query tuples + system-params). Allow a nivel crate.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-mod constellation;
 mod config;
+mod constellation;
 mod desktop;
 mod drill;
 mod frecency;
@@ -11,8 +11,8 @@ mod interaction;
 mod layout;
 mod lens;
 mod nav;
-mod pins;
 mod performance;
+mod pins;
 mod render;
 mod root;
 mod scan;
