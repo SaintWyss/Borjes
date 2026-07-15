@@ -166,7 +166,7 @@ pub fn search_ui(
             egui::Frame::new()
                 .fill(egui::Color32::from_rgba_premultiplied(4, 18, 24, 220))
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     egui::Color32::from_rgba_premultiplied(80, 230, 220, 160),
                 ))
                 .corner_radius(egui::CornerRadius::same(8))
@@ -200,7 +200,7 @@ pub fn search_ui(
                                         .color(color),
                                 )
                                 .fill(egui::Color32::from_rgba_premultiplied(4, 18, 24, 200))
-                                .stroke(egui::Stroke::new(1.0, color))
+                            .stroke(egui::Stroke::new(1.0_f32, color))
                                 .corner_radius(egui::CornerRadius::same(10));
                                 if ui.add(chip).clicked() {
                                     lens_clicked = Some(idx);
@@ -223,7 +223,7 @@ pub fn search_ui(
                                     egui::Color32::TRANSPARENT
                                 })
                                 .stroke(if selected {
-                                    egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 230, 220))
+                            egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(80, 230, 220))
                                 } else {
                                     egui::Stroke::NONE
                                 })
@@ -440,7 +440,7 @@ pub fn pin_chips(
                     )
                     .fill(egui::Color32::from_rgba_premultiplied(4, 18, 24, 220))
                     .stroke(egui::Stroke::new(
-                        1.0,
+                        1.0_f32,
                         egui::Color32::from_rgb(255, 214, 90),
                     ))
                     .corner_radius(egui::CornerRadius::same(8));
