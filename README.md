@@ -1,221 +1,192 @@
 # Borjes
 
-`Borjes` es una aplicacion de escritorio nativa escrita en Rust que visualiza un arbol de carpetas como una interfaz 3D navegable. Su objetivo principal es permitir encontrar y abrir carpetas profundas de `~/Data` rapidamente, sin tener que recorrer manualmente niveles de directorios en el explorador de archivos.
+Borjes es una aplicación de escritorio nativa para Linux, escrita en Rust, que permite navegar un árbol local de carpetas mediante un overlay 3D invocable por atajo. Está orientada a estructuras personales de conocimiento y trabajo donde llegar a carpetas profundas con un explorador tradicional genera fricción.
 
-El concepto de producto es **Borjes**: un overlay visual tipo mapa neuronal/galaxia para navegar informacion local. La version actual ya funciona como overlay fullscreen on-demand y muestra un nivel del arbol por vez: la carpeta actual aparece como nodo central y sus subcarpetas alrededor.
+La experiencia activa usa navegación radial por nivel: la carpeta actual aparece como hub central, sus subcarpetas se distribuyen alrededor y el padre se presenta como nodo de retorno. El proceso arranca oculto y se muestra u oculta mediante `SIGUSR1`.
 
-## Para que sirve
+## Estado del producto
 
-- Navegar visualmente una estructura grande de carpetas.
-- Reducir el tiempo para llegar a carpetas profundas y repetitivas.
-- Usar un overlay invocable por atajo global, sin mantener una ventana normal abierta.
-- Explorar `~/Data` con una interfaz radial: hub central, hijos alrededor y breadcrumb superior.
+**Versión del crate:** `0.1.0`  
+**Plataforma soportada y probada:** Linux desktop, principalmente KDE Plasma sobre X11.  
+**Distribución:** actualmente se compila desde el código fuente; todavía no existe AppImage, DEB, RPM ni paquete firmado mantenido por el repositorio.
 
-El caso de uso esperado es una carpeta personal de conocimiento/trabajo, por ejemplo:
+### Capacidades activas
 
-```text
-~/Data/
-  00_Inbox/
-  10_Workspace/
-  20_Knowledge/
-  30_Cybersecurity/
-```
+- Overlay fullscreen sin decoraciones y siempre arriba.
+- Arranque oculto y alternancia mediante `SIGUSR1`.
+- Raíz predeterminada `~/Data`.
+- Escaneo recursivo con exclusión de directorios de ruido.
+- Navegación radial por nivel.
+- Entrada por click o hover sostenido y retorno con `Backspace`.
+- Breadcrumb de la ubicación actual.
+- Búsqueda global sin acentos sobre el árbol indexado.
+- Resultados visualizados como constelación y abiertos con `Enter`.
+- Ranking por frecency para priorizar carpetas utilizadas recientemente.
+- Lentes temáticas configurables, invocables con `@nombre`.
+- Pins persistentes y accesos rápidos con `Alt+1` a `Alt+9`.
+- Personalización visual por carpeta mediante iconos incluidos, emoji, PNG o GLB/GLTF.
+- Persistencia local XDG para pins, iconos, lentes y frecency.
+- Render de bajo consumo cuando la ventana está oculta.
 
-## Estado actual
+### Límites conocidos
 
-La aplicacion arranca oculta y queda esperando una senal `SIGUSR1` para mostrarse u ocultarse. Cuando esta visible usa una ventana borderless fullscreen, siempre arriba, pensada para integrarse con un atajo global del entorno de escritorio.
+- La raíz activa sigue inicializándose desde `~/Data`; el editor de raíz existente en `ui.rs` pertenece al flujo heredado y no está conectado al loop principal.
+- La integración de escritorio está documentada para KDE y requiere configuración manual por usuario.
+- El mecanismo de mostrar/ocultar depende de señales Unix y no es portable a Windows o macOS.
+- El comportamiento sobre Wayland no tiene la misma aceptación que KDE/X11; foco, always-on-top y atajos pueden variar por compositor.
+- `frecency.json` y `lenses.json` todavía usan el directorio heredado `datatree-rs`, mientras que pins e iconos usan `borjes`.
+- No hay CI versionado en el repositorio ni artefactos binarios publicados.
 
-Funcionalidades activas:
+El estado detallado y los gates pendientes se mantienen en [`docs/RELEASE_STATUS.md`](docs/RELEASE_STATUS.md).
 
-- Overlay fullscreen sin decoraciones, siempre arriba.
-- Raiz por defecto: `~/Data`.
-- Escaneo recursivo de carpetas con exclusion de ruido como `node_modules`, `.git`, `.cache`, `target`, `__pycache__`, `Steam` y `.Trash`.
-- Navegacion por nivel:
-  - nodo central: carpeta actual;
-  - nodos alrededor: subcarpetas directas;
-  - nodo fantasma superior: carpeta padre.
-- Hover sostenido durante `0.5s` para entrar a una subcarpeta o subir al padre.
-- `Backspace` para volver a la carpeta padre.
-- Breadcrumb superior con el path actual.
-- Labels renderizados con `egui` sobre los nodos.
-- Representaciones visuales por carpeta: esfera default, PNG, emoji rasterizado o modelo GLB/GLTF.
-- Animaciones de entrada, glow/emissive materials y camara que se ajusta al tamano del nivel.
+## Uso rápido
 
-Hay modulos heredados o parcialmente preparados para etapas anteriores/siguientes:
+### 1. Preparar el entorno
 
-- `layout.rs`: layout global force-directed para renderizar todo el grafo a la vez.
-- `render.rs`: infraestructura para nodos globales, colores por cluster y file bursts.
-- `ui.rs`: buscador, resaltado y panel de reescaneo, actualmente no conectado al loop principal de Borjes.
-- `pins.rs`: persistencia de carpetas pineadas en JSON, tambien preparada para integracion futura.
+Se necesita:
 
-## Tecnologias
+- Rust estable y Cargo.
+- Toolchain C/C++ y `pkg-config`.
+- Dependencias nativas requeridas por Bevy para ventana, audio e input en Linux.
+- Una sesión gráfica Linux.
+- Una carpeta `~/Data` para usar la configuración predeterminada.
 
-- **Rust 2021**: lenguaje principal.
-- **Bevy 0.19**: motor de app, ECS, ventana, render 3D, input y camara.
-- **bevy_egui 0.40.1**: UI overlay para breadcrumb, labels y componentes de interfaz.
-- **bevy_panorbit_camera 0.35**: dependencia de camara usada por la arquitectura anterior y utilidades existentes.
-- **ignore 0.4**: recorrido de directorios respetando reglas de ignorado y filtrado.
-- **libc 0.2**: manejo de `SIGUSR1` para mostrar/ocultar el overlay.
-- **open 5.3.5**: apertura de rutas con la aplicacion del sistema.
-- **rand 0.8**: posiciones aleatorias en codigo de layout heredado.
-- **unicode-normalization 0.1**: normalizacion de texto para busqueda sin acentos.
+La guía completa está en [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 
-## Estructura del repo
-
-```text
-src/
-  main.rs          # bootstrap Bevy, ventana, recursos y sistemas activos
-  desktop.rs      # overlay on-demand: SIGUSR1, visibilidad y Escape
-  scan.rs         # escaneo de carpetas y archivos
-  nav.rs          # arbol en memoria y layout radial por nivel
-  drill.rs        # experiencia Borjes actual: hub, hijos, hover-dwell, labels
-  render.rs       # render de grafo global y assets reutilizables
-  interaction.rs  # clicks, hover, apertura de archivos/carpetas y pin visual
-  ui.rs           # buscador/panel/pin menu heredados
-  pins.rs         # persistencia de pins en config local
-  layout.rs       # layout force-directed global
-  root.rs         # configuracion de raiz y expansion de ~
-
-docs/
-  desktop-setup.md                         # setup de overlay y atajo KDE
-  superpowers/specs/*                      # decisiones de producto/diseno
-
-assets/icons/
-  *.png                                    # iconos disponibles para UI futura
-```
-
-## Requisitos
-
-- Rust estable con Cargo.
-- Linux desktop. El setup documentado esta orientado a KDE Plasma.
-- Dependencias del sistema necesarias para compilar Bevy en Linux, por ejemplo toolchain C/C++, `pkg-config`, bibliotecas X11/Wayland, ALSA y udev segun la distribucion.
-- Una carpeta `~/Data` si se quiere usar la raiz por defecto.
-
-## Ejecutar
-
-Compilar y ejecutar en modo release:
+### 2. Verificar y compilar
 
 ```bash
-cargo run --release
+cargo fmt --check
+cargo check
+cargo test
+cargo build --release
 ```
 
-La ventana inicia oculta. Para alternar visibilidad:
+### 3. Ejecutar
+
+```bash
+./target/release/borjes
+```
+
+La aplicación inicia oculta. Para mostrarla u ocultarla:
 
 ```bash
 pkill -USR1 -x borjes
 ```
 
-Para ocultar cuando esta visible:
-
-```text
-Esc
-```
-
-Para cerrar el proceso:
+Para detener el proceso:
 
 ```bash
 pkill -x borjes
 ```
 
-En KDE se puede bindear `pkill -USR1 -x borjes` a un atajo global, por ejemplo `Meta+1`. Ver [docs/desktop-setup.md](docs/desktop-setup.md) para el setup de autostart y atajo.
+Para uso diario conviene configurar autostart y un atajo global. Ver [`docs/desktop-setup.md`](docs/desktop-setup.md).
 
 ## Controles
 
-- **Mostrar/ocultar overlay**: enviar `SIGUSR1` al proceso.
-- **Entrar a una subcarpeta**: mantener el cursor sobre un nodo hijo hasta completar el anillo de progreso.
-- **Subir al padre**: mantener el cursor sobre el nodo fantasma superior.
-- **Subir al padre con teclado**: `Backspace`.
-- **Personalizar una carpeta**: click derecho sobre un nodo y elegir icono, emoji, PNG, GLB o reset.
-- **Ocultar overlay**: `Esc`.
+| Acción | Control |
+|---|---|
+| Mostrar u ocultar | señal `SIGUSR1` desde el atajo global |
+| Buscar | escribir al abrir el overlay |
+| Elegir resultado | click, `Enter`, `Tab` o flechas |
+| Limpiar búsqueda | `Esc` con una consulta activa |
+| Ocultar overlay | `Esc` con la búsqueda vacía |
+| Entrar a una subcarpeta | click o hover sostenido sobre el nodo |
+| Subir al padre | nodo superior o `Backspace` |
+| Abrir carpeta actual | `Enter` con búsqueda vacía |
+| Personalizar o fijar | click derecho sobre una carpeta |
+| Usar pin rápido | click en el chip o `Alt+1` a `Alt+9` |
+| Activar lente | chip temático o consulta `@nombre` |
 
-## Tests
+## Arquitectura resumida
 
-Ejecutar la suite:
-
-```bash
-cargo test
+```mermaid
+flowchart LR
+    SIGNAL[SIGUSR1 / Escape] --> DESKTOP[desktop.rs]
+    DESKTOP --> WINDOW[Ventana Bevy]
+    ROOT[RootConfig: ~/Data] --> SCAN[scan.rs]
+    SCAN --> TREE[FolderTree indexado]
+    TREE --> NAV[NavState]
+    NAV --> DRILL[drill/*]
+    TREE --> SEARCH[search.rs]
+    SEARCH --> CONSTELLATION[constellation.rs]
+    LENSES[lens.rs] --> SEARCH
+    PINS[pins.json] --> SEARCH
+    ICONS[icons.json] --> DRILL
+    FRECENCY[frecency.json] --> SEARCH
+    DRILL --> RENDER[Bevy 3D + egui]
 ```
 
-Los tests cubren, entre otras cosas:
+La aplicación conserva módulos del enfoque anterior de grafo global, pero el flujo productivo actual es el drill-down por nivel. La separación entre código activo, reutilizado y heredado está detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-- expansion de `~`;
-- escaneo de carpetas y archivos;
-- exclusion de archivos ocultos o directorios de ruido;
-- limite de 200 archivos por burst;
-- layout radial determinista;
-- layout force-directed sin NaN/infinitos;
-- normalizacion de busqueda sin acentos;
-- serializacion de pins.
+## Estructura principal
+
+```text
+src/
+├── main.rs            composition root de Bevy y sistemas activos
+├── desktop.rs         señal, visibilidad, foco y always-on-top
+├── scan.rs            recorrido y filtrado del filesystem
+├── nav.rs             árbol indexado y navegación
+├── drill/             experiencia radial activa
+├── search.rs          búsqueda global, constelaciones y pins rápidos
+├── constellation.rs   presentación de resultados globales
+├── lens.rs            temas configurables
+├── frecency.rs        ranking por uso reciente
+├── icons.rs           overrides visuales persistentes
+├── pins.rs            persistencia de accesos rápidos
+├── root.rs            raíz predeterminada y reescaneo
+├── layout.rs          layout force-directed heredado
+├── render.rs          render global heredado y assets reutilizados
+└── ui.rs              panel global heredado; solo una parte sigue registrada
+
+docs/
+├── README.md
+├── ARCHITECTURE.md
+├── INSTALLATION.md
+├── CONFIGURATION.md
+├── TESTING.md
+├── RELEASE_STATUS.md
+└── desktop-setup.md
+```
 
 ## Persistencia local
 
-Los pins se guardan en:
+Borjes no usa una base de datos. Mantiene archivos JSON en el directorio de configuración del usuario.
 
-```text
-$XDG_CONFIG_HOME/borjes/pins.json
+| Dato | Ruta actual |
+|---|---|
+| Pins | `$XDG_CONFIG_HOME/borjes/pins.json` o `~/.config/borjes/pins.json` |
+| Iconos | `$XDG_CONFIG_HOME/borjes/icons.json` o `~/.config/borjes/icons.json` |
+| Frecency | `$XDG_CONFIG_HOME/datatree-rs/frecency.json` o `~/.config/datatree-rs/frecency.json` |
+| Lentes | `$XDG_CONFIG_HOME/datatree-rs/lenses.json` o `~/.config/datatree-rs/lenses.json` |
+| Assets externos | `~/.config/borjes/assets/` cuando se usan rutas de usuario |
+
+No se debe asumir que esos archivos son intercambiables entre equipos: pins, frecency e iconos pueden contener rutas absolutas.
+
+La referencia completa está en [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+
+## Validación
+
+```bash
+cargo fmt --check
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+cargo build --release
 ```
 
-Si `XDG_CONFIG_HOME` no esta definido:
+Las pruebas automáticas cubren lógica de escaneo, navegación, búsqueda, layout, persistencia, iconos, lentes y frecency. La interacción real con KWin, señales, GPU, foco y apertura de carpetas requiere aceptación manual en escritorio. Ver [`docs/TESTING.md`](docs/TESTING.md).
 
-```text
-~/.config/borjes/pins.json
-```
+## Documentación
 
-En el estado actual, la infraestructura de pins existe en el codigo pero no forma parte del flujo principal de NEURA.
+- [Índice documental](docs/README.md)
+- [Arquitectura implementada](docs/ARCHITECTURE.md)
+- [Instalación y compilación](docs/INSTALLATION.md)
+- [Configuración y persistencia](docs/CONFIGURATION.md)
+- [Integración de escritorio](docs/desktop-setup.md)
+- [Testing y aceptación](docs/TESTING.md)
+- [Estado de release](docs/RELEASE_STATUS.md)
 
-## Iconos y modelos personalizados
+## Licencia
 
-Las representaciones por carpeta se guardan en:
-
-```text
-$XDG_CONFIG_HOME/borjes/icons.json
-```
-
-Si `XDG_CONFIG_HOME` no esta definido:
-
-```text
-~/.config/borjes/icons.json
-```
-
-Formato:
-
-```json
-{
-  "folders": {
-    "/home/user/Data/30_Cybersecurity": {
-      "kind": "png",
-      "asset": "icons/shield.png",
-      "scale": 1.0
-    },
-    "20_Knowledge": {
-      "kind": "emoji",
-      "emoji": "📚",
-      "scale": 1.1
-    },
-    "Robotics": {
-      "kind": "model",
-      "asset": "custom/robot.glb",
-      "scale": 0.8
-    }
-  }
-}
-```
-
-`asset` puede apuntar a `assets/` del repo, por ejemplo `icons/folder.png` o `custom/robot.glb`, o a un archivo absoluto bajo `~/.config/borjes/assets/`. El formato viejo `{ "FolderName": "shield" }` sigue funcionando como alias a `assets/icons/shield.png`.
-
-## Notas de arquitectura
-
-El repo conserva dos enfoques:
-
-1. **Grafo global tipo galaxia**: escanea todas las carpetas, calcula posiciones 3D con un layout force-directed y renderiza clusters por raiz. Esa ruta existe en `layout.rs`/`render.rs`, pero no es el flujo principal actual.
-2. **Drill-down por nivel**: carga el arbol completo en memoria y renderiza solo la carpeta actual con sus hijos. Esta es la experiencia activa, implementada principalmente en `nav.rs` y `drill.rs`.
-
-El segundo enfoque reduce ruido visual y evita mostrar miles de nodos a la vez. La aplicacion mantiene el arbol completo indexado para navegar sin reescanear en cada nivel.
-
-## Roadmap sugerido
-
-- Reconectar buscador como teletransporte a carpetas profundas.
-- Integrar pins como accesos rapidos navegables.
-- Permitir configurar la raiz desde UI activa o argumento CLI.
-- Unificar o retirar codigo heredado del grafo global cuando Borjes este completo.
-- Agregar instrucciones por distribucion para dependencias nativas de Bevy.
+El repositorio no contiene actualmente un archivo `LICENSE`. Antes de distribuir binarios o aceptar contribuciones externas se debe definir explícitamente la licencia del código propio y revisar las licencias de dependencias y assets.
