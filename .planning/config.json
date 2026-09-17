@@ -40,5 +40,6 @@
   "agent_skills": {},
   "features": {},
   "mode": "yolo",
-  "granularity": "coarse"
+  "granularity": "coarse",
+  "claude_md_path": "./AGENTS.md"
 }
