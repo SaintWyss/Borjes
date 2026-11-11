@@ -1,4 +1,9 @@
-# Borjes
+<h1 align="center">Borjes</h1>
+
+<p align="center"><strong>Navegación visual de carpetas para Linux.</strong><br/>Rust · Bevy · escritorio</p>
+
+> Proyecto en desarrollo. El alcance y la validación de cada funcionalidad se detallan a continuación.
+
 
 Borjes es una aplicación de escritorio nativa para Linux, escrita en Rust, que permite navegar un árbol local de carpetas mediante un overlay 3D invocable por atajo. Está orientada a estructuras personales de conocimiento y trabajo donde llegar a carpetas profundas con un explorador tradicional genera fricción.
 
