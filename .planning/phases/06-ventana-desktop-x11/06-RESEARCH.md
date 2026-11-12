@@ -358,7 +358,7 @@ Not a rename/refactor phase — but there IS per-machine OS/desktop state to tou
 **What goes wrong:** `BorderlessFullscreen(MonitorSelection::Current)` fills a single monitor; the user's other monitor keeps the plain Plasma wallpaper.
 **Why it happens:** One winit window = one fullscreen monitor.
 **How to avoid:** For Phase 6 MVP, single-monitor is fine (spec doesn't require multi-mon). If needed later: a window sized to the bounding box of all monitors, or one window per monitor (out of scope now — flag, don't build).
-**Warning signs:** Graph only on the primary screen. The user's setup (Santiago-PC has a TV + main panel per memory) means this *will* be visible — note it but keep MVP single-monitor.
+**Warning signs:** Graph only on the primary screen. The user's setup (equipo de escritorio has a TV + main panel per memory) means this *will* be visible — note it but keep MVP single-monitor.
 
 ### Pitfall 5: AnyDesk / X11 interaction
 **What goes wrong:** Concern that a fullscreen desktop-layer GL app interferes with AnyDesk.

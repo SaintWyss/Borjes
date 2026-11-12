@@ -61,7 +61,7 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 | 15 | Pins: chips dorados + Alt+1-9 + menú Pin/Unpin | ✅ 100e471a |
 | 16 | Frecencia (half-life 14d) + Enter-vacío abre hub | ✅ 100e471a |
 
-App renombrada **Borjes** (NEURA = nombre viejo, 72cde055). Regla KWin `[borjes-focus]` op 020 (foco al re-mostrar; Santiago-PC pendiente).
+App renombrada **Borjes** (NEURA = nombre viejo, 72cde055). Regla KWin `[borjes-focus]` op 020 (foco al re-mostrar; equipo de escritorio pendiente).
 
 ## Current Position
 
