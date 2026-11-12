@@ -1,5 +1,4 @@
 use bevy::gltf::GltfAssetLabel;
-use bevy::prelude::*;
 
 use super::*;
 use crate::frecency::{self, Frecency};

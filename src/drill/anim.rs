@@ -1,5 +1,3 @@
-use bevy::prelude::*;
-
 use super::*;
 
 // Grow-in (scale 0→base, ease-out) + smooth hover bump, per node.

@@ -1,5 +1,3 @@
-use bevy::prelude::*;
-
 use super::*;
 
 #[derive(Resource)]
