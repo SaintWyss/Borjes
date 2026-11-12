@@ -61,11 +61,11 @@ Post-v1: fix zoom-on-search (target_radius). Pendiente smoke-test interactivo de
 | 15 | Pins: chips dorados + Alt+1-9 + menú Pin/Unpin | ✅ 100e471a |
 | 16 | Frecencia (half-life 14d) + Enter-vacío abre hub | ✅ 100e471a |
 
-App renombrada **Borjes** (NEURA = nombre viejo, 72cde055). Regla KWin `[borjes-focus]` op 020 (foco al re-mostrar; Santiago-PC pendiente).
+App renombrada **Borjes** (NEURA = nombre viejo, 72cde055). Regla KWin `[borjes-focus]` op 020 (foco al re-mostrar; equipo de escritorio pendiente).
 
 ## Current Position
 
 Phase: — (milestone v4 code COMPLETE, 4/4)
 Plan: —
 Status: v4 "Búsqueda primero" implementado; 98 tests. PENDIENTE: smoke test del usuario (Meta+1→tipear→Enter, Tab, Alt+N, pins) + verificar foco KWin en sesión real.
-Last activity: 2026-07-01 — F13-F16 + rename Borjes + regla KWin (saint-acer)
+Last activity: 2026-07-01 — F13-F16 + rename Borjes + regla KWin (equipo de escritorio)

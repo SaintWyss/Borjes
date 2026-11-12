@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Borjes
+Comment=Navegador visual de carpetas
+Exec=borjes-toggle
+Icon=system-file-manager
+Terminal=false
+Categories=Utility;FileManager;
+Keywords=folders;files;search;carpetas;archivos;

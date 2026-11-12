@@ -8,7 +8,7 @@
 - Binding en `~/.config/kglobalshortcutsrc` `[services][datatree-toggle.desktop]` `_launch=Meta+1`.
 - Reload `systemctl --user restart plasma-kglobalaccel.service` + `kbuildsycoca6`.
 - **Verificado por usuario: Meta+1 togglea el overlay** ("genial"). ✅
-- Registrado en sync-control `system-ops.tsv` op **016** (per-máquina Santiago-PC).
+- Registrado en sync-control `system-ops.tsv` op **016** (per-máquina equipo de escritorio).
 - `docs/desktop-setup.md` (Codex): qué es, por qué no es ventana-Desktop, toggle/Esc, binding KDE, costo, troubleshooting.
 
 ## Coexistencia (DESK-02)

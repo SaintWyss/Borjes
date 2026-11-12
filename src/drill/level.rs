@@ -1,7 +1,7 @@
 use bevy::gltf::GltfAssetLabel;
-use bevy::prelude::*;
 
 use super::*;
+use crate::frecency::{self, Frecency};
 use crate::icons::{self, IconConfig, VisualKind, VisualSpec};
 use crate::nav::{self, radial_layout};
 use crate::pins::PinStore;
@@ -46,6 +46,7 @@ pub fn render_level(
     asset_server: Res<AssetServer>,
     icon_cfg: Res<IconConfig>,
     pin_store: Res<PinStore>,
+    frecency_store: Res<Frecency>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cache: Local<Option<CachedLevelAssets>>,
@@ -66,6 +67,7 @@ pub fn render_level(
     let current = nav.current;
     let child_ids = nav.tree.children(current).to_vec();
     let positions = radial_layout(child_ids.len());
+    let now = frecency::now_secs();
 
     // Hub = focus node at the origin.
     if let Some(node) = nav.tree.node(current) {
@@ -80,7 +82,15 @@ pub fn render_level(
                 count: child_ids.len(),
                 kind: NodeKind::Hub,
                 translation: Vec3::ZERO,
-                base: HUB_RADIUS,
+                base: HUB_RADIUS
+                    * visual_weight(
+                        child_ids.len(),
+                        frecency_store
+                            .0
+                            .get(&node.path)
+                            .map(|entry| frecency::decayed(entry, now))
+                            .unwrap_or_default(),
+                    ),
                 material: assets.hub_mat.clone(),
                 sphere: assets.sphere.clone(),
                 quad: assets.quad.clone(),
@@ -145,7 +155,15 @@ pub fn render_level(
                 count: grandchildren,
                 kind: NodeKind::Child,
                 translation: child_pos,
-                base: CHILD_RADIUS,
+                base: CHILD_RADIUS
+                    * visual_weight(
+                        grandchildren,
+                        frecency_store
+                            .0
+                            .get(&child_path)
+                            .map(|entry| frecency::decayed(entry, now))
+                            .unwrap_or_default(),
+                    ),
                 material,
                 sphere: assets.sphere.clone(),
                 quad: assets.quad.clone(),
@@ -220,6 +238,12 @@ pub fn render_level(
     cam_target.distance = distance;
 
     nav.dirty = false;
+}
+
+fn visual_weight(child_count: usize, frecency_score: f64) -> f32 {
+    let structure = (child_count as f32).ln_1p() * 0.075;
+    let usage = (frecency_score.clamp(0.0, 20.0) as f32) * 0.012;
+    (1.0 + structure + usage).clamp(1.0, 1.45)
 }
 
 enum NodeRole {
@@ -352,4 +376,17 @@ fn spawn_folder_node(
             }
         }
     });
+}
+
+#[cfg(test)]
+mod visual_weight_tests {
+    use super::visual_weight;
+
+    #[test]
+    fn important_folders_grow_but_remain_bounded() {
+        assert_eq!(visual_weight(0, 0.0), 1.0);
+        assert!(visual_weight(12, 0.0) > visual_weight(1, 0.0));
+        assert!(visual_weight(1, 10.0) > visual_weight(1, 0.0));
+        assert!(visual_weight(usize::MAX, f64::MAX) <= 1.45);
+    }
 }

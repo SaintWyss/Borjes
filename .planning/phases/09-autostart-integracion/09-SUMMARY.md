@@ -5,7 +5,7 @@ status: complete
 
 # Summary — Phase 9: Autostart + integración escritorio
 
-Config-only phase (no code). Executed directly on saint-acer.
+Config-only phase (no code). Executed directly on equipo de escritorio.
 
 ## What was built
 

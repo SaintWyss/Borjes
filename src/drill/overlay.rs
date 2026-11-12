@@ -1,4 +1,3 @@
-use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 
 use super::*;
@@ -285,7 +284,7 @@ pub fn draw_hover_ring(
     // Retícula: dos arcos de 110° enfrentados que giran despacio — señala
     // "clickeable" sin ser un círculo muerto. Halo interior tenue de apoyo.
     let spin = time.elapsed_secs() * 0.9;
-    let stroke = egui::Stroke::new(2.5, egui::Color32::from_rgb(110, 230, 245));
+    let stroke = egui::Stroke::new(2.5_f32, egui::Color32::from_rgb(110, 230, 245));
     for half in 0..2 {
         let start = spin + half as f32 * std::f32::consts::PI;
         let points: Vec<egui::Pos2> = (0..=18)
@@ -300,7 +299,7 @@ pub fn draw_hover_ring(
         center,
         30.0,
         egui::Stroke::new(
-            1.0,
+            1.0_f32,
             egui::Color32::from_rgba_premultiplied(60, 130, 140, 90),
         ),
     );
@@ -356,7 +355,7 @@ pub fn draw_labels(
                         painter.circle_stroke(
                             egui::pos2(screen.x, screen.y),
                             26.0,
-                            egui::Stroke::new(1.5, egui::Color32::from_rgb(*r, *g, *b)),
+                            egui::Stroke::new(1.5_f32, egui::Color32::from_rgb(*r, *g, *b)),
                         );
                     }
                 }

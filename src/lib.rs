@@ -2,6 +2,7 @@
 // disparan estos lints por diseño del ECS. Allow a nivel crate (recomendación oficial Bevy).
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+pub mod config;
 pub mod constellation;
 pub mod desktop;
 pub mod drill;
@@ -11,9 +12,11 @@ pub mod interaction;
 pub mod layout;
 pub mod lens;
 pub mod nav;
+pub mod performance;
 pub mod pins;
 pub mod render;
 pub mod root;
 pub mod scan;
 pub mod search;
+pub mod settings;
 pub mod ui;
