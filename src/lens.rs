@@ -54,8 +54,6 @@ pub fn load_lenses() -> Vec<Lens> {
     }
 }
 
-// Editor de lentes en la UI = pendiente; mientras, lenses.json se edita a mano.
-#[allow(dead_code)]
 pub fn save_lenses(lenses: &[Lens]) {
     let Some(path) = lenses_path() else {
         return;
@@ -132,15 +130,7 @@ pub fn find_lens<'a>(lenses: &'a [Lens], prefix: &str) -> Option<&'a Lens> {
 }
 
 fn lenses_path() -> Option<PathBuf> {
-    if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-        if !config_home.is_empty() {
-            return Some(PathBuf::from(config_home).join("datatree-rs/lenses.json"));
-        }
-    }
-
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config/datatree-rs/lenses.json"))
+    crate::config::config_file("lenses.json")
 }
 
 fn default_lenses() -> Vec<Lens> {

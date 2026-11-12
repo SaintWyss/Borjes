@@ -1,0 +1,14 @@
+[Unit]
+Description=Borjes visual folder navigator
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/borjes
+Environment=BORJES_ASSET_DIR=%h/.local/share/borjes
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
