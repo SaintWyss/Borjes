@@ -68,4 +68,4 @@ App renombrada **Borjes** (NEURA = nombre viejo, 72cde055). Regla KWin `[borjes-
 Phase: — (milestone v4 code COMPLETE, 4/4)
 Plan: —
 Status: v4 "Búsqueda primero" implementado; 98 tests. PENDIENTE: smoke test del usuario (Meta+1→tipear→Enter, Tab, Alt+N, pins) + verificar foco KWin en sesión real.
-Last activity: 2026-07-01 — F13-F16 + rename Borjes + regla KWin (saint-acer)
+Last activity: 2026-07-01 — F13-F16 + rename Borjes + regla KWin (equipo de escritorio)
